@@ -169,19 +169,24 @@ function getIngresoMes(ingresos, monthK) {
   return { q1, q2, bono };
 }
 function simularCuota(c) {
-  const montoBase = c.montoTotal / c.numCuotas;
+  const montosBase = (c.montosPersonalizados && c.montosPersonalizados.length === c.numCuotas) ? c.montosPersonalizados : null;
+  const montoBaseDefault = c.montoTotal / c.numCuotas;
   const abonos = c.abonos || {};
   let saldo = c.montoTotal;
   let mes = c.mesInicio;
   const pagos = [];
-  let guard = 0;
+  let guard = 0, index = 0;
   while (saldo > 0.005 && guard < 600) {
+    const montoBaseEsteMes = montosBase
+      ? (montosBase[index] !== undefined ? montosBase[index] : montosBase[montosBase.length - 1])
+      : montoBaseDefault;
     const extra = abonos[mes] || 0;
-    const monto = Math.min(montoBase + extra, saldo);
+    const monto = Math.min(montoBaseEsteMes + extra, saldo);
     saldo = Math.max(saldo - monto, 0);
     pagos.push({ mes, numero: pagos.length + 1, monto, tieneAbono: extra > 0, saldoRestante: saldo });
     mes = addMonths(mes, 1);
     guard += 1;
+    index += 1;
   }
   return pagos;
 }
@@ -501,10 +506,13 @@ function ControlGastos({ user }) {
 
   const [descCuota, setDescCuota] = useState('');
   const [catCuota, setCatCuota] = useState(CATEGORIAS[0].id);
+  const [tarjetaCuota, setTarjetaCuota] = useState('');
   const [montoTotalCuota, setMontoTotalCuota] = useState('');
   const [numCuotas, setNumCuotas] = useState('');
   const [mesInicioCuota, setMesInicioCuota] = useState(currentMonth);
   const [diaCuota, setDiaCuota] = useState(String(hoyDia()));
+  const [personalizarCuotas, setPersonalizarCuotas] = useState(false);
+  const [montosCuotaPersonalizados, setMontosCuotaPersonalizados] = useState([]);
   const [monedaCuota, setMonedaCuota] = useState('GTQ');
 
   const [descFijo, setDescFijo] = useState('');
@@ -587,6 +595,17 @@ function ControlGastos({ user }) {
   }, [data, loaded, user.uid]);
 
   useEffect(() => { setMesInicioCuota(currentMonth); setMesInicioFijo(currentMonth); }, [currentMonth]);
+  useEffect(() => {
+    if (!personalizarCuotas) return;
+    const n = parseInt(numCuotas, 10);
+    if (!n || n < 1) return;
+    setMontosCuotaPersonalizados((prev) => {
+      if (prev.length === n) return prev;
+      const total = parseFloat(montoTotalCuota) || 0;
+      const base = n > 0 ? (total / n).toFixed(2) : '0.00';
+      return Array.from({ length: n }, (_, i) => (prev[i] !== undefined ? prev[i] : base));
+    });
+  }, [personalizarCuotas, numCuotas]);
   useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); }, [currentMonth]);
   useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); }, [view]);
 
@@ -656,6 +675,16 @@ function ControlGastos({ user }) {
     return map;
   }, [todosGastosTC]);
 
+  const cuotasPorTarjeta = useMemo(() => {
+    const map = {};
+    data.cuotas.forEach((c) => {
+      if (!c.tarjetaId) return;
+      if (!map[c.tarjetaId]) map[c.tarjetaId] = [];
+      map[c.tarjetaId].push(c);
+    });
+    return map;
+  }, [data.cuotas]);
+
   const historialPagosTarjeta = useMemo(
     () => getHistorialPagosTarjeta(data.tarjetas, data.pagosTarjeta || []),
     [data.tarjetas, data.pagosTarjeta]
@@ -682,13 +711,23 @@ function ControlGastos({ user }) {
     if (!descCuota.trim() || !total || total <= 0 || !n || n < 1) return;
     const tc = data.tipoCambio || TIPO_CAMBIO_DEFAULT;
     const esUSD = monedaCuota === 'USD';
+    const fx = esUSD ? tc : 1;
+    let montosPersonalizados = null;
+    if (personalizarCuotas && montosCuotaPersonalizados.length === n) {
+      const parsed = montosCuotaPersonalizados.map((v) => parseFloat(v));
+      if (parsed.every((v) => !isNaN(v) && v >= 0)) {
+        montosPersonalizados = parsed.map((v) => v * fx);
+      }
+    }
     const cuota = {
       id: uid(), descripcion: descCuota.trim(), categoria: catCuota, montoTotal: esUSD ? total * tc : total,
-      numCuotas: n, mesInicio: mesInicioCuota, dia: clampDia(diaCuota), metodoPago: 'tarjeta',
+      numCuotas: n, mesInicio: mesInicioCuota, dia: clampDia(diaCuota), metodoPago: 'tarjeta', tarjetaId: tarjetaCuota || null,
+      ...(montosPersonalizados ? { montosPersonalizados } : {}),
       ...(esUSD ? { moneda: 'USD', montoTotalOriginal: total, tipoCambioUsado: tc } : {}),
     };
     setData((prev) => ({ ...prev, cuotas: [...prev.cuotas, cuota] }));
     setDescCuota(''); setMontoTotalCuota(''); setNumCuotas('');
+    setPersonalizarCuotas(false); setMontosCuotaPersonalizados([]);
   }
   function addGastoFijo() {
     const monto = parseFloat(montoFijo);
@@ -1070,10 +1109,56 @@ function ControlGastos({ user }) {
                 Día de cobro
                 <input className="field" type="number" min="1" max="31" placeholder="Día (1-31)" value={diaCuota} onChange={(e) => setDiaCuota(e.target.value)} />
               </label>
+              <label className="field-label">
+                Tarjeta (opcional)
+                <select className="field" value={tarjetaCuota} onChange={(e) => setTarjetaCuota(e.target.value)}>
+                  <option value="">Sin especificar</option>
+                  {data.tarjetas.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                </select>
+              </label>
               {monedaCuota === 'USD' && montoTotalCuota && parseFloat(montoTotalCuota) > 0 && (
                 <p className="hint">≈ {formatQ(parseFloat(montoTotalCuota) * tcActual)} al tipo de cambio actual</p>
               )}
-              {cuotaMontoPreview !== null && (<p className="hint">Cada cuota será de {formatQ(cuotaMontoPreview)}</p>)}
+              {cuotaMontoPreview !== null && !personalizarCuotas && (<p className="hint">Cada cuota será de {formatQ(cuotaMontoPreview)}</p>)}
+              {numCuotas && parseInt(numCuotas, 10) > 0 && montoTotalCuota && parseFloat(montoTotalCuota) > 0 && (
+                <button
+                  type="button"
+                  className="abono-link"
+                  onClick={() => {
+                    const n = parseInt(numCuotas, 10);
+                    if (!personalizarCuotas) {
+                      const total = parseFloat(montoTotalCuota) || 0;
+                      const base = n > 0 ? (total / n).toFixed(2) : '0.00';
+                      setMontosCuotaPersonalizados(Array.from({ length: n }, () => base));
+                    }
+                    setPersonalizarCuotas(!personalizarCuotas);
+                  }}
+                >
+                  {personalizarCuotas ? 'Usar el mismo monto en todas' : 'Personalizar el monto de cada cuota'}
+                </button>
+              )}
+              {personalizarCuotas && (
+                <div className="cuotas-personalizadas">
+                  {montosCuotaPersonalizados.map((val, i) => (
+                    <div key={i} className="cuota-personalizada-row">
+                      <span className="cuota-personalizada-label">Cuota {i + 1}</span>
+                      <input
+                        type="number" step="0.01" min="0" className="field"
+                        value={val}
+                        onChange={(e) => {
+                          const copy = [...montosCuotaPersonalizados];
+                          copy[i] = e.target.value;
+                          setMontosCuotaPersonalizados(copy);
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <p className="hint">
+                    Suma: {monedaCuota === 'USD' ? '$' : 'Q'} {montosCuotaPersonalizados.reduce((a, v) => a + (parseFloat(v) || 0), 0).toFixed(2)}
+                    {' '}de {monedaCuota === 'USD' ? '$' : 'Q'} {(parseFloat(montoTotalCuota) || 0).toFixed(2)}
+                  </p>
+                </div>
+              )}
               <button className="btn-add" onClick={addCuota}
                       disabled={!descCuota.trim() || !montoTotalCuota || !numCuotas || parseFloat(montoTotalCuota) <= 0 || parseInt(numCuotas, 10) < 1}>
                 <Icon name="plus" size={16} /> Agregar compra a cuotas
@@ -1180,6 +1265,7 @@ function ControlGastos({ user }) {
                     <div className="cuota-body">
                       <div className="row-desc">
                         {c.descripcion} <span className="pill pill-cuota">Cuota {c.cuotaActual}/{c.numCuotas}</span>
+                        {c.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === c.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
                         {c.tieneAbono && <span className="pill pill-abono">+ abono</span>}
                         {c.moneda === 'USD' && <span className="pill pill-usd">${c.montoTotalOriginal.toFixed(2)} USD</span>}
                         <PaymentTag metodo={c.metodoPago} />
@@ -1292,6 +1378,8 @@ function ControlGastos({ user }) {
                 {data.tarjetas.map((t) => {
                   const resumen = simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], currentMonth);
                   const compras = gastosTCPorTarjeta[t.id] || [];
+                  const cuotasVinculadas = cuotasPorTarjeta[t.id] || [];
+                  const totalCargos = compras.length + cuotasVinculadas.length;
                   const abierta = !!tarjetasAbiertas[t.id];
                   return (
                     <li key={t.id} className="ledger-row">
@@ -1329,10 +1417,10 @@ function ControlGastos({ user }) {
                               + Registrar pago
                             </button>
                           )}
-                          {compras.length > 0 && (
+                          {totalCargos > 0 && (
                             <button className="tarjeta-toggle-btn" onClick={() => toggleTarjetaAbierta(t.id)}>
                               <Icon name="chevronDown" size={14} style={abierta ? { transform: 'rotate(180deg)' } : {}} />
-                              {abierta ? 'Ocultar' : 'Mostrar'} {compras.length} compra{compras.length !== 1 ? 's' : ''}
+                              {abierta ? 'Ocultar' : 'Mostrar'} {totalCargos} cargo{totalCargos !== 1 ? 's' : ''}
                             </button>
                           )}
                         </div>
@@ -1345,10 +1433,30 @@ function ControlGastos({ user }) {
 
             {data.tarjetas.map((t) => {
               const compras = gastosTCPorTarjeta[t.id] || [];
+              const cuotasVinculadas = cuotasPorTarjeta[t.id] || [];
               const abierta = !!tarjetasAbiertas[t.id];
-              if (!abierta || compras.length === 0) return null;
+              if (!abierta || (compras.length === 0 && cuotasVinculadas.length === 0)) return null;
               return (
                 <ul className="ledger-list tarjeta-compras-list" key={`compras-${t.id}`}>
+                  {cuotasVinculadas.map((c) => {
+                    const compromiso = getCompromiso(c, currentMonth);
+                    return (
+                      <li key={`cuota-${c.id}`} className="ledger-row">
+                        <div className="row-main">
+                          <CategoryBadge id={c.categoria} />
+                          <div>
+                            <div className="row-desc">
+                              {c.descripcion} <span className="pill pill-cuota">Cuota · {c.numCuotas} meses</span>
+                            </div>
+                            <p className="meta-detail">
+                              Total: {formatQ(c.montoTotal)}
+                              {compromiso.restantes > 0 && ` · quedan ${compromiso.restantes} cuota${compromiso.restantes !== 1 ? 's' : ''}`}
+                            </p>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
                   {compras.map((g) => (
                     <li key={g.id} className="ledger-row">
                       <div className="row-main">
@@ -1835,6 +1943,10 @@ const STYLES = `
 
 .abono-link { background:none; border:none; color:var(--accent); font-size:11.5px; padding:6px 0 0; margin:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
 .tarjeta-toggle-btn { display:flex; align-items:center; gap:4px; background:none; border:none; color:var(--text-secondary); font-size:11.5px; font-weight:600; padding:8px 0 0; margin:0; cursor:pointer; font-family:'Inter', sans-serif; }
+.cuotas-personalizadas { display:flex; flex-direction:column; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:260px; overflow-y:auto; }
+.cuota-personalizada-row { display:flex; align-items:center; gap:8px; }
+.cuota-personalizada-label { font-size:12px; color:var(--text-secondary); min-width:56px; flex-shrink:0; }
+.cuota-personalizada-row .field { padding:7px 10px; font-size:13px; }
 .tarjeta-toggle-btn:hover { color:var(--silver); }
 .tarjeta-toggle-btn svg { transition: transform 0.15s ease; }
 .tarjeta-compras-list { margin-top:-4px; }

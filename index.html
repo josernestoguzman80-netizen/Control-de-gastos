@@ -35,7 +35,7 @@
 </script>
 
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 
 /* ============================== ICONOS ============================== */
 const ICON_PATHS = {
@@ -546,6 +546,8 @@ function ControlGastos({ user }) {
   const [pagoTarjetaDraft, setPagoTarjetaDraft] = useState('');
   const [pagoTarjetaFecha, setPagoTarjetaFecha] = useState(hoyISO());
   const [tarjetasAbiertas, setTarjetasAbiertas] = useState({});
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(76);
 
   // Cargar datos de Firestore (solo del usuario que inició sesión)
   useEffect(() => {
@@ -597,6 +599,15 @@ function ControlGastos({ user }) {
   }, [data, loaded, user.uid]);
 
   useEffect(() => { setMesInicioCuota(currentMonth); setMesInicioFijo(currentMonth); }, [currentMonth]);
+  useEffect(() => {
+    function medir() {
+      if (navRef.current) setNavHeight(navRef.current.offsetHeight);
+    }
+    medir();
+    const t = setTimeout(medir, 300);
+    window.addEventListener('resize', medir);
+    return () => { window.removeEventListener('resize', medir); clearTimeout(t); };
+  }, []);
   useEffect(() => {
     if (!personalizarCuotas) return;
     const n = parseInt(numCuotas, 10);
@@ -899,7 +910,7 @@ function ControlGastos({ user }) {
   return (
     <div className="app-shell">
       <style>{STYLES}</style>
-      <div className="app-container">
+      <div className="app-container" style={{ paddingBottom: navHeight + 24 }}>
         <div className="header-row">
           <div className="header-title">
             <span className="header-icon"><Icon name="wallet" size={20} /></span>
@@ -1865,24 +1876,24 @@ function ControlGastos({ user }) {
             )}
           </>
         )}
-
-        <nav className="tab-bar">
-          <div className="tab-bar-inner">
-            <button className={`tab-bar-btn ${view === 'inicio' ? 'active' : ''}`} onClick={() => setView('inicio')}>
-              <Icon name="layoutDashboard" size={20} /><span>Inicio</span>
-            </button>
-            <button className={`tab-bar-btn ${view === 'tendencia' ? 'active' : ''}`} onClick={() => setView('tendencia')}>
-              <Icon name="trendingUp" size={20} /><span>Tendencia</span>
-            </button>
-            <button className={`tab-bar-btn ${view === 'ahorro' ? 'active' : ''}`} onClick={() => setView('ahorro')}>
-              <Icon name="piggyBank" size={20} /><span>Ahorro</span>
-            </button>
-            <button className={`tab-bar-btn ${view === 'tarjetas' ? 'active' : ''}`} onClick={() => setView('tarjetas')}>
-              <Icon name="creditCard" size={20} /><span>Tarjetas</span>
-            </button>
-          </div>
-        </nav>
       </div>
+
+      <nav className="tab-bar" ref={navRef}>
+        <div className="tab-bar-inner">
+          <button className={`tab-bar-btn ${view === 'inicio' ? 'active' : ''}`} onClick={() => setView('inicio')}>
+            <Icon name="layoutDashboard" size={20} /><span>Inicio</span>
+          </button>
+          <button className={`tab-bar-btn ${view === 'tendencia' ? 'active' : ''}`} onClick={() => setView('tendencia')}>
+            <Icon name="trendingUp" size={20} /><span>Tendencia</span>
+          </button>
+          <button className={`tab-bar-btn ${view === 'ahorro' ? 'active' : ''}`} onClick={() => setView('ahorro')}>
+            <Icon name="piggyBank" size={20} /><span>Ahorro</span>
+          </button>
+          <button className={`tab-bar-btn ${view === 'tarjetas' ? 'active' : ''}`} onClick={() => setView('tarjetas')}>
+            <Icon name="creditCard" size={20} /><span>Tarjetas</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
@@ -1911,6 +1922,10 @@ function Root() {
 const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 * { box-sizing: border-box; }
+.app-shell { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.app-shell input, .app-shell select, .app-shell textarea {
+  -webkit-user-select: text; -moz-user-select: text; user-select: text; -webkit-touch-callout: default;
+}
 .app-shell {
   --bg: #0B192C;
   --surface: #101F36;
@@ -1930,13 +1945,13 @@ const STYLES = `
   background-image: radial-gradient(circle at 15% -5%, rgba(10,132,255,0.10), transparent 45%);
   color: var(--text);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  padding: 32px 16px 140px;
+  padding: 32px 16px;
   display: flex;
   justify-content: center;
 }
 .app-container { width: 100%; max-width: 640px; animation: riseIn 0.5s ease both; }
 .auth-container { width: 100%; max-width: 380px; margin-top: 10vh; animation: riseIn 0.5s ease both; }
-@keyframes riseIn { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:translateY(0);} }
+@keyframes riseIn { from { opacity:0; } to {opacity:1;} }
 
 .header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
 .header-title { display:flex; align-items:center; gap:12px; min-width:0; }

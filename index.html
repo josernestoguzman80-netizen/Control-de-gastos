@@ -152,6 +152,10 @@ function formatQ(n) {
   const sign = num < 0 ? '-' : '';
   return sign + 'Q ' + Math.abs(num).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function formatQD(n, tc) {
+  const usd = tc > 0 ? Math.abs(Number(n) || 0) / tc : 0;
+  return `${formatQ(n)} ($${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+}
 function catInfo(id) { return CATEGORIAS.find((c) => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1]; }
 function catColor(id) { return catInfo(id).color; }
 function catLabel(id) { return catInfo(id).label; }
@@ -319,6 +323,48 @@ function getHistorialPagosTarjeta(tarjetas, pagosTarjeta) {
       return { ...p, fecha, tarjetaNombre: t ? t.nombre : '—' };
     })
     .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
+}
+function getMesesConCargos(tarjeta, data, hastaMes) {
+  const meses = new Set();
+  data.gastosTC.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => {
+    const ciclo = calcularCicloTC(g.fechaCompra, tarjeta.diaCorte, tarjeta.diaPago);
+    if (ciclo.mesPago <= hastaMes) meses.add(ciclo.mesPago);
+  });
+  data.gastos.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => {
+    if (g.mes <= hastaMes) meses.add(g.mes);
+  });
+  data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id).forEach((f) => {
+    let m = f.mesInicio, guard = 0;
+    while (m <= hastaMes && guard < 600) { meses.add(m); m = addMonths(m, 1); guard++; }
+  });
+  data.cuotas.filter((c) => c.tarjetaId === tarjeta.id).forEach((c) => {
+    simularCuota(c).forEach((p) => { if (p.mes <= hastaMes) meses.add(p.mes); });
+  });
+  return [...meses].sort((a, b) => (a < b ? 1 : -1));
+}
+function getEntradasTarjetaMes(tarjeta, data, mes) {
+  const entradas = [];
+  getCuotasActivas(data.cuotas.filter((c) => c.tarjetaId === tarjeta.id), mes).forEach((c) => {
+    entradas.push({ tipo: 'cuota', dia: c.dia || 999, item: c });
+  });
+  data.gastos.filter((g) => g.tarjetaId === tarjeta.id && g.mes === mes).forEach((g) => {
+    entradas.push({ tipo: 'unico', dia: g.dia || 999, item: g });
+  });
+  data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && mes >= f.mesInicio).forEach((f) => {
+    entradas.push({ tipo: 'fijo', dia: f.dia || 999, item: f });
+  });
+  data.gastosTC.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => {
+    const ciclo = calcularCicloTC(g.fechaCompra, tarjeta.diaCorte, tarjeta.diaPago);
+    if (ciclo.mesPago === mes) entradas.push({ tipo: 'tc', dia: parseISODate(g.fechaCompra).getDate(), item: g, ciclo });
+  });
+  return entradas.sort((a, b) => a.dia - b.dia);
+}
+function getTotalTarjetaMes(tarjeta, data, mes) {
+  const resumenTC = simularTarjeta(tarjeta, data.gastosTC, data.pagosTarjeta || [], mes).montoDelMes;
+  const fijos = data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && mes >= f.mesInicio).reduce((a, f) => a + f.monto, 0);
+  const unicos = data.gastos.filter((g) => g.tarjetaId === tarjeta.id && g.mes === mes).reduce((a, g) => a + g.monto, 0);
+  const cuotas = getCuotasActivas(data.cuotas.filter((c) => c.tarjetaId === tarjeta.id), mes).reduce((a, c) => a + c.montoCuota, 0);
+  return resumenTC + fijos + unicos + cuotas;
 }
 
 /* ============================== INSIGNIAS ============================== */
@@ -544,10 +590,17 @@ function ControlGastos({ user }) {
   const [montoTC, setMontoTC] = useState('');
   const [monedaTC, setMonedaTC] = useState('GTQ');
   const [fechaCompraTC, setFechaCompraTC] = useState(hoyISO());
+  const [editandoGastoTCId, setEditandoGastoTCId] = useState(null);
+  const [editGastoTCMonto, setEditGastoTCMonto] = useState('');
+  const [editandoGastoFijoId, setEditandoGastoFijoId] = useState(null);
+  const [editGastoFijoMonto, setEditGastoFijoMonto] = useState('');
   const [pagoTarjetaFormId, setPagoTarjetaFormId] = useState(null);
   const [pagoTarjetaDraft, setPagoTarjetaDraft] = useState('');
   const [pagoTarjetaFecha, setPagoTarjetaFecha] = useState(hoyISO());
+  const [monedaPagoTarjeta, setMonedaPagoTarjeta] = useState('GTQ');
+  const [tasaPagoTarjeta, setTasaPagoTarjeta] = useState('');
   const [tarjetasAbiertas, setTarjetasAbiertas] = useState({});
+  const [mesesTarjetaAbiertos, setMesesTarjetaAbiertos] = useState({});
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(76);
 
@@ -783,6 +836,27 @@ function ControlGastos({ user }) {
   function removeGasto(id) { setData((prev) => ({ ...prev, gastos: prev.gastos.filter((g) => g.id !== id) })); }
   function removeCuota(id) { setData((prev) => ({ ...prev, cuotas: prev.cuotas.filter((c) => c.id !== id) })); }
   function removeGastoFijo(id) { setData((prev) => ({ ...prev, gastosFijos: prev.gastosFijos.filter((f) => f.id !== id) })); }
+  function iniciarEdicionGastoFijo(f) {
+    setEditGastoFijoMonto(f.moneda === 'USD' ? String(f.montoOriginal) : String(f.monto));
+    setEditandoGastoFijoId(f.id);
+  }
+  function guardarEdicionGastoFijo(id) {
+    const val = parseFloat(editGastoFijoMonto);
+    if (isNaN(val) || val <= 0) { setEditandoGastoFijoId(null); return; }
+    const tc = data.tipoCambio || TIPO_CAMBIO_DEFAULT;
+    setData((prev) => ({
+      ...prev,
+      gastosFijos: prev.gastosFijos.map((f) => {
+        if (f.id !== id) return f;
+        if (f.moneda === 'USD') {
+          return { ...f, monto: val * tc, montoOriginal: val, tipoCambioUsado: tc };
+        }
+        return { ...f, monto: val };
+      }),
+    }));
+    setEditandoGastoFijoId(null);
+    setEditGastoFijoMonto('');
+  }
   function addTarjeta() {
     const corte = parseInt(diaCorteTarjeta, 10);
     const pago = parseInt(diaPagoTarjeta, 10);
@@ -811,15 +885,45 @@ function ControlGastos({ user }) {
     setDescTC(''); setMontoTC('');
   }
   function removeGastoTC(id) { setData((prev) => ({ ...prev, gastosTC: prev.gastosTC.filter((g) => g.id !== id) })); }
+  function iniciarEdicionGastoTC(g) {
+    setEditGastoTCMonto(g.moneda === 'USD' ? String(g.montoOriginal) : String(g.monto));
+    setEditandoGastoTCId(g.id);
+  }
+  function guardarEdicionGastoTC(id) {
+    const val = parseFloat(editGastoTCMonto);
+    if (isNaN(val) || val <= 0) { setEditandoGastoTCId(null); return; }
+    const tc = data.tipoCambio || TIPO_CAMBIO_DEFAULT;
+    setData((prev) => ({
+      ...prev,
+      gastosTC: prev.gastosTC.map((g) => {
+        if (g.id !== id) return g;
+        if (g.moneda === 'USD') {
+          return { ...g, monto: val * tc, montoOriginal: val, tipoCambioUsado: tc };
+        }
+        return { ...g, monto: val };
+      }),
+    }));
+    setEditandoGastoTCId(null);
+    setEditGastoTCMonto('');
+  }
   function addPagoTarjeta(tarjetaId) {
     const val = parseFloat(pagoTarjetaDraft);
     if (isNaN(val) || val <= 0 || !pagoTarjetaFecha) { setPagoTarjetaFormId(null); return; }
-    setData((prev) => ({
-      ...prev,
-      pagosTarjeta: [...(prev.pagosTarjeta || []), { id: uid(), tarjetaId, fecha: pagoTarjetaFecha, monto: val }],
-    }));
+    const esUSD = monedaPagoTarjeta === 'USD';
+    const tasaEspecifica = parseFloat(tasaPagoTarjeta);
+    const tc = esUSD ? ((!isNaN(tasaEspecifica) && tasaEspecifica > 0) ? tasaEspecifica : (data.tipoCambio || TIPO_CAMBIO_DEFAULT)) : null;
+    const pago = {
+      id: uid(),
+      tarjetaId,
+      fecha: pagoTarjetaFecha,
+      monto: esUSD ? val * tc : val,
+      ...(esUSD ? { moneda: 'USD', montoOriginal: val, tipoCambioUsado: tc } : {}),
+    };
+    setData((prev) => ({ ...prev, pagosTarjeta: [...(prev.pagosTarjeta || []), pago] }));
     setPagoTarjetaFormId(null);
     setPagoTarjetaDraft('');
+    setTasaPagoTarjeta('');
+    setMonedaPagoTarjeta('GTQ');
   }
   function removePagoTarjeta(id) {
     setData((prev) => ({ ...prev, pagosTarjeta: (prev.pagosTarjeta || []).filter((p) => p.id !== id) }));
@@ -827,6 +931,10 @@ function ControlGastos({ user }) {
   }
   function toggleTarjetaAbierta(id) {
     setTarjetasAbiertas((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+  function toggleMesTarjeta(tarjetaId, mes) {
+    const key = `${tarjetaId}__${mes}`;
+    setMesesTarjetaAbiertos((prev) => ({ ...prev, [key]: !prev[key] }));
   }
   function saveAbono(cuotaId) {
     const val = parseFloat(abonoDraft);
@@ -1358,24 +1466,52 @@ function ControlGastos({ user }) {
                   <div className="row-main">
                     <CategoryBadge id={f.categoria} />
                     <DayBadge dia={f.dia} />
-                    <div className="row-desc">
-                      {f.descripcion} <span className="pill">Fijo</span>
-                      {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
-                      {f.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === f.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
-                      <PaymentTag metodo={f.metodoPago} />
+                    <div className={editandoGastoFijoId === f.id ? '' : 'row-desc'}>
+                      {editandoGastoFijoId === f.id ? (
+                        <>
+                          <div className="row-desc">
+                            {f.descripcion} <span className="pill">Fijo</span>
+                          </div>
+                          <div className="abono-form">
+                            <input
+                              type="number" step="0.01" min="0" autoFocus
+                              className="abono-input"
+                              placeholder={f.moneda === 'USD' ? 'Monto ($)' : 'Monto (Q)'}
+                              value={editGastoFijoMonto}
+                              onChange={(e) => setEditGastoFijoMonto(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') guardarEdicionGastoFijo(f.id); if (e.key === 'Escape') setEditandoGastoFijoId(null); }}
+                            />
+                            <button className="icon-btn small" onClick={() => guardarEdicionGastoFijo(f.id)} aria-label="Guardar"><Icon name="check" size={16} /></button>
+                            <button className="icon-btn small" onClick={() => setEditandoGastoFijoId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                          </div>
+                          {f.moneda === 'USD' && editGastoFijoMonto && parseFloat(editGastoFijoMonto) > 0 && (
+                            <p className="hint">≈ {formatQ(parseFloat(editGastoFijoMonto) * tcActual)} con la tasa actual (Q{tcActual})</p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {f.descripcion} <span className="pill">Fijo</span>
+                          {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
+                          {f.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === f.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
+                          <PaymentTag metodo={f.metodoPago} />
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div className="row-actions">
-                    <span className="amount-mono negative">-{formatQ(f.monto)}</span>
-                    {confirmingId === f.id ? (
-                      <span className="confirm-group">
-                        <button className="icon-btn small" onClick={() => { removeGastoFijo(f.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
-                        <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
-                      </span>
-                    ) : (
-                      <button className="icon-btn small danger" onClick={() => setConfirmingId(f.id)} aria-label="Eliminar gasto fijo"><Icon name="trash" size={14} /></button>
-                    )}
-                  </div>
+                  {editandoGastoFijoId !== f.id && (
+                    <div className="row-actions">
+                      <span className="amount-mono negative">-{formatQ(f.monto)}</span>
+                      <button className="icon-btn small" onClick={() => iniciarEdicionGastoFijo(f)} aria-label="Editar monto"><Icon name="pencil" size={13} /></button>
+                      {confirmingId === f.id ? (
+                        <span className="confirm-group">
+                          <button className="icon-btn small" onClick={() => { removeGastoFijo(f.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
+                          <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                        </span>
+                      ) : (
+                        <button className="icon-btn small danger" onClick={() => setConfirmingId(f.id)} aria-label="Eliminar gasto fijo"><Icon name="trash" size={14} /></button>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
               {resumenTarjetasMes.map((t) => (
@@ -1677,11 +1813,8 @@ function ControlGastos({ user }) {
                 <ul className="ledger-list">
                   {data.tarjetas.map((t) => {
                     const resumen = simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], currentMonth);
-                    const compras = gastosTCPorTarjeta[t.id] || [];
-                    const cuotasVinculadas = cuotasPorTarjeta[t.id] || [];
-                    const unicosVinculados = gastosUnicosPorTarjeta[t.id] || [];
-                    const fijosVinculados = gastosFijosPorTarjeta[t.id] || [];
-                    const totalCargos = compras.length + cuotasVinculadas.length + unicosVinculados.length + fijosVinculados.length;
+                    const totalMesActual = getTotalTarjetaMes(t, data, currentMonth);
+                    const meses = getMesesConCargos(t, data, currentMonth);
                     const abierta = !!tarjetasAbiertas[t.id];
                     return (
                       <li key={t.id} className="ledger-row">
@@ -1690,19 +1823,23 @@ function ControlGastos({ user }) {
                           <div className="cuota-body">
                             <div className="row-desc">{t.nombre}</div>
                             <p className="meta-detail">
-                              Pago de este mes: {formatQ(resumen.montoDelMes)}
-                              {resumen.ajusteAcumulado > 0 && ` · ${formatQ(resumen.ajusteAcumulado)} a favor`}
-                              {resumen.ajusteAcumulado < 0 && ` · debes ${formatQ(-resumen.ajusteAcumulado)} adicional`}
+                              Pago de este mes: {formatQD(totalMesActual, tcActual)}
+                              {resumen.ajusteAcumulado > 0 && ` · ${formatQD(resumen.ajusteAcumulado, tcActual)} a favor`}
+                              {resumen.ajusteAcumulado < 0 && ` · debes ${formatQD(-resumen.ajusteAcumulado, tcActual)} adicional`}
                             </p>
                             {pagoTarjetaFormId === t.id ? (
                               <div className="abono-form">
                                 <input
                                   type="number" step="0.01" min="0" autoFocus
-                                  className="abono-input" placeholder="Monto que pagaste (Q)"
+                                  className="abono-input" placeholder={monedaPagoTarjeta === 'USD' ? 'Monto que pagaste ($)' : 'Monto que pagaste (Q)'}
                                   value={pagoTarjetaDraft}
                                   onChange={(e) => setPagoTarjetaDraft(e.target.value)}
                                   onKeyDown={(e) => { if (e.key === 'Enter') addPagoTarjeta(t.id); if (e.key === 'Escape') setPagoTarjetaFormId(null); }}
                                 />
+                                <div className="currency-toggle">
+                                  <button type="button" className={`currency-btn ${monedaPagoTarjeta === 'GTQ' ? 'active' : ''}`} onClick={() => setMonedaPagoTarjeta('GTQ')}>Q</button>
+                                  <button type="button" className={`currency-btn ${monedaPagoTarjeta === 'USD' ? 'active' : ''}`} onClick={() => setMonedaPagoTarjeta('USD')}>$</button>
+                                </div>
                                 <input
                                   type="date" className="abono-input"
                                   value={pagoTarjetaFecha}
@@ -1714,15 +1851,32 @@ function ControlGastos({ user }) {
                             ) : (
                               <button
                                 className="abono-link"
-                                onClick={() => { setPagoTarjetaDraft(''); setPagoTarjetaFecha(hoyISO()); setPagoTarjetaFormId(t.id); }}
+                                onClick={() => { setPagoTarjetaDraft(''); setPagoTarjetaFecha(hoyISO()); setMonedaPagoTarjeta('GTQ'); setTasaPagoTarjeta(''); setPagoTarjetaFormId(t.id); }}
                               >
                                 + Registrar pago
                               </button>
                             )}
-                            {totalCargos > 0 && (
+                            {pagoTarjetaFormId === t.id && monedaPagoTarjeta === 'USD' && (
+                              <div className="abono-form" style={{ marginTop: 6 }}>
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  className="abono-input" placeholder={`Tasa (opcional, ej. ${tcActual})`}
+                                  value={tasaPagoTarjeta}
+                                  onChange={(e) => setTasaPagoTarjeta(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') addPagoTarjeta(t.id); if (e.key === 'Escape') setPagoTarjetaFormId(null); }}
+                                />
+                              </div>
+                            )}
+                            {pagoTarjetaFormId === t.id && monedaPagoTarjeta === 'USD' && pagoTarjetaDraft && parseFloat(pagoTarjetaDraft) > 0 && (
+                              <p className="hint">
+                                ≈ {formatQ(parseFloat(pagoTarjetaDraft) * ((parseFloat(tasaPagoTarjeta) > 0) ? parseFloat(tasaPagoTarjeta) : tcActual))}
+                                {' '}con tasa {(parseFloat(tasaPagoTarjeta) > 0) ? tasaPagoTarjeta : `${tcActual} (actual)`}
+                              </p>
+                            )}
+                            {meses.length > 0 && (
                               <button className="tarjeta-toggle-btn" onClick={() => toggleTarjetaAbierta(t.id)}>
                                 <Icon name="chevronDown" size={14} style={abierta ? { transform: 'rotate(180deg)' } : {}} />
-                                {abierta ? 'Ocultar' : 'Mostrar'} {totalCargos} cargo{totalCargos !== 1 ? 's' : ''}
+                                {abierta ? 'Ocultar' : 'Mostrar'} historial por mes
                               </button>
                             )}
                           </div>
@@ -1734,110 +1888,134 @@ function ControlGastos({ user }) {
               )}
 
               {data.tarjetas.map((t) => {
-                const compras = gastosTCPorTarjeta[t.id] || [];
-                const cuotasVinculadas = cuotasPorTarjeta[t.id] || [];
-                const unicosVinculados = gastosUnicosPorTarjeta[t.id] || [];
-                const fijosVinculados = gastosFijosPorTarjeta[t.id] || [];
                 const abierta = !!tarjetasAbiertas[t.id];
-                const totalItems = compras.length + cuotasVinculadas.length + unicosVinculados.length + fijosVinculados.length;
-                if (!abierta || totalItems === 0) return null;
-
-                const entradas = [
-                  ...cuotasVinculadas.map((c) => ({ tipo: 'cuota', dia: c.dia || 999, item: c })),
-                  ...unicosVinculados.map((g) => ({ tipo: 'unico', dia: g.dia || 999, item: g })),
-                  ...fijosVinculados.map((f) => ({ tipo: 'fijo', dia: f.dia || 999, item: f })),
-                  ...compras.map((g) => ({ tipo: 'tc', dia: parseISODate(g.fechaCompra).getDate(), item: g })),
-                ].sort((a, b) => a.dia - b.dia);
-
+                if (!abierta) return null;
+                const meses = getMesesConCargos(t, data, currentMonth);
+                if (meses.length === 0) return null;
                 return (
-                  <ul className="ledger-list tarjeta-compras-list" key={`compras-${t.id}`}>
-                    {entradas.map((e) => {
-                      if (e.tipo === 'cuota') {
-                        const c = e.item;
-                        const compromiso = getCompromiso(c, currentMonth);
-                        return (
-                          <li key={`cuota-${c.id}`} className="ledger-row">
-                            <div className="row-main">
-                              <CategoryBadge id={c.categoria} />
-                              <DayBadge dia={c.dia} />
-                              <div>
-                                <div className="row-desc">
-                                  {c.descripcion} <span className="pill pill-cuota">Cuota · {c.numCuotas} meses</span>
-                                </div>
-                                <p className="meta-detail">
-                                  Total: {formatQ(c.montoTotal)}
-                                  {compromiso.restantes > 0 && ` · quedan ${compromiso.restantes} cuota${compromiso.restantes !== 1 ? 's' : ''}`}
-                                </p>
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      }
-                      if (e.tipo === 'unico') {
-                        const g = e.item;
-                        return (
-                          <li key={`unico-${g.id}`} className="ledger-row">
-                            <div className="row-main">
-                              <CategoryBadge id={g.categoria} />
-                              <DayBadge dia={g.dia} />
-                              <div className="row-desc">
-                                {g.descripcion}
-                                {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
-                              </div>
-                            </div>
-                            <div className="row-actions">
-                              <span className="amount-mono negative">-{formatQ(g.monto)}</span>
-                            </div>
-                          </li>
-                        );
-                      }
-                      if (e.tipo === 'fijo') {
-                        const f = e.item;
-                        return (
-                          <li key={`fijo-${f.id}`} className="ledger-row">
-                            <div className="row-main">
-                              <CategoryBadge id={f.categoria} />
-                              <DayBadge dia={f.dia} />
-                              <div className="row-desc">
-                                {f.descripcion} <span className="pill">Fijo</span>
-                                {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
-                              </div>
-                            </div>
-                            <div className="row-actions">
-                              <span className="amount-mono negative">-{formatQ(f.monto)}</span>
-                            </div>
-                          </li>
-                        );
-                      }
-                      const g = e.item;
+                  <div key={`meses-${t.id}`} className="tarjeta-meses-wrap">
+                    {meses.map((mes) => {
+                      const mesKey = `${t.id}__${mes}`;
+                      const mesAbierto = !!mesesTarjetaAbiertos[mesKey];
+                      const totalMes = getTotalTarjetaMes(t, data, mes);
+                      const entradas = mesAbierto ? getEntradasTarjetaMes(t, data, mes) : [];
                       return (
-                        <li key={g.id} className="ledger-row">
-                          <div className="row-main">
-                            <CategoryBadge id={g.categoria} />
-                            <DayBadge dia={e.dia} />
-                            <div>
-                              <div className="row-desc">
-                                {g.descripcion}
-                                {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
-                              </div>
-                              <p className="meta-detail">Corte: {formatFechaCorta(g.fechaCorte)} · Pago: {formatFechaCorta(g.fechaPago)}</p>
-                            </div>
-                          </div>
-                          <div className="row-actions">
-                            <span className="amount-mono negative">-{formatQ(g.monto)}</span>
-                            {confirmingId === `tc__${g.id}` ? (
-                              <span className="confirm-group">
-                                <button className="icon-btn small" onClick={() => { removeGastoTC(g.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
-                                <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
-                              </span>
-                            ) : (
-                              <button className="icon-btn small danger" onClick={() => setConfirmingId(`tc__${g.id}`)} aria-label="Eliminar gasto con TC"><Icon name="trash" size={14} /></button>
-                            )}
-                          </div>
-                        </li>
+                        <div key={mes} className="tarjeta-mes-group">
+                          <button className="tarjeta-mes-toggle" onClick={() => toggleMesTarjeta(t.id, mes)}>
+                            <Icon name="chevronDown" size={14} style={mesAbierto ? { transform: 'rotate(180deg)' } : {}} />
+                            <span className="tarjeta-mes-nombre">{monthLabel(mes)}</span>
+                            <span className="amount-mono small">{formatQD(totalMes, tcActual)}</span>
+                          </button>
+                          {mesAbierto && (
+                            <ul className="ledger-list tarjeta-compras-list">
+                              {entradas.map((e) => {
+                                if (e.tipo === 'cuota') {
+                                  const c = e.item;
+                                  return (
+                                    <li key={`cuota-${c.id}`} className="ledger-row">
+                                      <div className="row-main">
+                                        <CategoryBadge id={c.categoria} />
+                                        <DayBadge dia={c.dia} />
+                                        <div className="row-desc">
+                                          {c.descripcion} <span className="pill pill-cuota">Cuota {c.cuotaActual}/{c.numCuotas}</span>
+                                        </div>
+                                      </div>
+                                      <div className="row-actions">
+                                        <span className="amount-mono negative">-{formatQ(c.montoCuota)}</span>
+                                      </div>
+                                    </li>
+                                  );
+                                }
+                                if (e.tipo === 'unico') {
+                                  const g = e.item;
+                                  return (
+                                    <li key={`unico-${g.id}`} className="ledger-row">
+                                      <div className="row-main">
+                                        <CategoryBadge id={g.categoria} />
+                                        <DayBadge dia={g.dia} />
+                                        <div className="row-desc">
+                                          {g.descripcion}
+                                          {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
+                                        </div>
+                                      </div>
+                                      <div className="row-actions">
+                                        <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                      </div>
+                                    </li>
+                                  );
+                                }
+                                if (e.tipo === 'fijo') {
+                                  const f = e.item;
+                                  return (
+                                    <li key={`fijo-${f.id}`} className="ledger-row">
+                                      <div className="row-main">
+                                        <CategoryBadge id={f.categoria} />
+                                        <DayBadge dia={f.dia} />
+                                        <div className="row-desc">
+                                          {f.descripcion} <span className="pill">Fijo</span>
+                                          {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
+                                        </div>
+                                      </div>
+                                      <div className="row-actions">
+                                        <span className="amount-mono negative">-{formatQ(f.monto)}</span>
+                                      </div>
+                                    </li>
+                                  );
+                                }
+                                const g = e.item;
+                                return (
+                                  <li key={g.id} className="ledger-row">
+                                    <div className="row-main">
+                                      <CategoryBadge id={g.categoria} />
+                                      <DayBadge dia={e.dia} />
+                                      <div>
+                                        <div className="row-desc">
+                                          {g.descripcion}
+                                          {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
+                                        </div>
+                                        <p className="meta-detail">Corte: {formatFechaCorta(e.ciclo.fechaCorte)} · Pago: {formatFechaCorta(e.ciclo.fechaPago)}</p>
+                                        {editandoGastoTCId === g.id && (
+                                          <div className="abono-form">
+                                            <input
+                                              type="number" step="0.01" min="0" autoFocus
+                                              className="abono-input"
+                                              placeholder={g.moneda === 'USD' ? 'Monto ($)' : 'Monto (Q)'}
+                                              value={editGastoTCMonto}
+                                              onChange={(e2) => setEditGastoTCMonto(e2.target.value)}
+                                              onKeyDown={(e2) => { if (e2.key === 'Enter') guardarEdicionGastoTC(g.id); if (e2.key === 'Escape') setEditandoGastoTCId(null); }}
+                                            />
+                                            <button className="icon-btn small" onClick={() => guardarEdicionGastoTC(g.id)} aria-label="Guardar"><Icon name="check" size={16} /></button>
+                                            <button className="icon-btn small" onClick={() => setEditandoGastoTCId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                                          </div>
+                                        )}
+                                        {editandoGastoTCId === g.id && g.moneda === 'USD' && editGastoTCMonto && parseFloat(editGastoTCMonto) > 0 && (
+                                          <p className="hint">≈ {formatQ(parseFloat(editGastoTCMonto) * tcActual)} con la tasa actual (Q{tcActual})</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {editandoGastoTCId !== g.id && (
+                                      <div className="row-actions">
+                                        <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                        <button className="icon-btn small" onClick={() => iniciarEdicionGastoTC(g)} aria-label="Editar monto"><Icon name="pencil" size={13} /></button>
+                                        {confirmingId === `tc__${g.id}` ? (
+                                          <span className="confirm-group">
+                                            <button className="icon-btn small" onClick={() => { removeGastoTC(g.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
+                                            <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                                          </span>
+                                        ) : (
+                                          <button className="icon-btn small danger" onClick={() => setConfirmingId(`tc__${g.id}`)} aria-label="Eliminar gasto con TC"><Icon name="trash" size={14} /></button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
                       );
                     })}
-                  </ul>
+                  </div>
                 );
               })}
 
@@ -1850,7 +2028,10 @@ function ControlGastos({ user }) {
                         <div className="row-main">
                           <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
                           <DayBadge dia={parseISODate(p.fecha).getDate()} />
-                          <div className="row-desc">{p.tarjetaNombre} <span className="cat-name">{formatFechaCorta(parseISODate(p.fecha))}</span></div>
+                          <div className="row-desc">
+                            {p.tarjetaNombre} <span className="cat-name">{formatFechaCorta(parseISODate(p.fecha))}</span>
+                            {p.moneda === 'USD' && <span className="pill pill-usd">${p.montoOriginal.toFixed(2)} USD</span>}
+                          </div>
                         </div>
                         <div className="row-actions">
                           <span className="amount-mono positive">+{formatQ(p.monto)}</span>
@@ -2074,6 +2255,12 @@ const STYLES = `
 
 .abono-link { background:none; border:none; color:var(--accent); font-size:11.5px; padding:6px 0 0; margin:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
 .tarjeta-toggle-btn { display:flex; align-items:center; gap:4px; background:none; border:none; color:var(--text-secondary); font-size:11.5px; font-weight:600; padding:8px 0 0; margin:0; cursor:pointer; font-family:'Inter', sans-serif; }
+.tarjeta-meses-wrap { margin-top:4px; }
+.tarjeta-mes-group { border-top:1px solid var(--border); }
+.tarjeta-mes-toggle { display:flex; align-items:center; gap:8px; width:100%; background:none; border:none; color:var(--text); padding:12px 0; cursor:pointer; font-family:'Inter', sans-serif; }
+.tarjeta-mes-toggle svg { color:var(--text-secondary); transition: transform 0.15s ease; flex-shrink:0; }
+.tarjeta-mes-nombre { flex:1; text-align:left; font-size:13.5px; font-weight:600; }
+.tarjeta-mes-group .tarjeta-compras-list { margin:0 0 8px; padding-left:4px; }
 .cuotas-personalizadas { display:flex; flex-direction:column; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:260px; overflow-y:auto; }
 .cuota-personalizada-row { display:flex; align-items:center; gap:8px; }
 .cuota-personalizada-label { font-size:12px; color:var(--text-secondary); min-width:56px; flex-shrink:0; }

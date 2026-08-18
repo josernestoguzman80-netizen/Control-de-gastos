@@ -252,6 +252,17 @@ function clampDia(v) {
   if (!n || n < 1) return null;
   return Math.min(n, 31);
 }
+function gastoFijoActivoEnMes(f, monthK) {
+  if (monthK < f.mesInicio) return false;
+  const hoy = hoyISO();
+  const mesHoy = hoy.slice(0, 7);
+  if (monthK === mesHoy) {
+    const diaCobro = f.dia || 1;
+    const fechaCobroEsteMes = `${monthK}-${String(diaCobro).padStart(2, '0')}`;
+    return fechaCobroEsteMes <= hoy;
+  }
+  return true;
+}
 function getGastosTCActivos(gastosTC, tarjetas, monthK) {
   return gastosTC.map((g) => {
     const tarjeta = tarjetas.find((t) => t.id === g.tarjetaId);
@@ -290,7 +301,7 @@ function simularTarjeta(tarjeta, gastosTC, pagosTarjeta, hastaMes) {
 function getTotalGastosMes(data, monthK) {
   const unicos = data.gastos.filter((g) => g.mes === monthK).reduce((a, g) => a + g.monto, 0);
   const cuotas = getCuotasActivas(data.cuotas, monthK).reduce((a, c) => a + c.montoCuota, 0);
-  const fijos = data.gastosFijos.filter((f) => monthK >= f.mesInicio).reduce((a, f) => a + f.monto, 0);
+  const fijos = data.gastosFijos.filter((f) => gastoFijoActivoEnMes(f, monthK)).reduce((a, f) => a + f.monto, 0);
   const tc = data.tarjetas.reduce((a, t) => a + simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], monthK).montoDelMes, 0);
   return unicos + cuotas + fijos + tc;
 }
@@ -350,7 +361,7 @@ function getEntradasTarjetaMes(tarjeta, data, mes) {
   data.gastos.filter((g) => g.tarjetaId === tarjeta.id && g.mes === mes).forEach((g) => {
     entradas.push({ tipo: 'unico', dia: g.dia || 999, item: g });
   });
-  data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && mes >= f.mesInicio).forEach((f) => {
+  data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && gastoFijoActivoEnMes(f, mes)).forEach((f) => {
     entradas.push({ tipo: 'fijo', dia: f.dia || 999, item: f });
   });
   data.gastosTC.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => {
@@ -361,7 +372,7 @@ function getEntradasTarjetaMes(tarjeta, data, mes) {
 }
 function getTotalTarjetaMes(tarjeta, data, mes) {
   const resumenTC = simularTarjeta(tarjeta, data.gastosTC, data.pagosTarjeta || [], mes).montoDelMes;
-  const fijos = data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && mes >= f.mesInicio).reduce((a, f) => a + f.monto, 0);
+  const fijos = data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && gastoFijoActivoEnMes(f, mes)).reduce((a, f) => a + f.monto, 0);
   const unicos = data.gastos.filter((g) => g.tarjetaId === tarjeta.id && g.mes === mes).reduce((a, g) => a + g.monto, 0);
   const cuotas = getCuotasActivas(data.cuotas.filter((c) => c.tarjetaId === tarjeta.id), mes).reduce((a, c) => a + c.montoCuota, 0);
   return resumenTC + fijos + unicos + cuotas;
@@ -679,7 +690,7 @@ function ControlGastos({ user }) {
 
   const gastosUnicosMes = useMemo(() => data.gastos.filter((g) => g.mes === currentMonth).sort((a, b) => (a.dia || 999) - (b.dia || 999)), [data.gastos, currentMonth]);
   const cuotasActivasMes = useMemo(() => getCuotasActivas(data.cuotas, currentMonth), [data.cuotas, currentMonth]);
-  const gastosFijosActivosMes = useMemo(() => data.gastosFijos.filter((f) => currentMonth >= f.mesInicio).sort((a, b) => (a.dia || 999) - (b.dia || 999)), [data.gastosFijos, currentMonth]);
+  const gastosFijosActivosMes = useMemo(() => data.gastosFijos.filter((f) => gastoFijoActivoEnMes(f, currentMonth)).sort((a, b) => (a.dia || 999) - (b.dia || 999)), [data.gastosFijos, currentMonth]);
   const gastosTCActivosMes = useMemo(() => getGastosTCActivos(data.gastosTC, data.tarjetas, currentMonth), [data.gastosTC, data.tarjetas, currentMonth]);
   const resumenTarjetasMes = useMemo(() => {
     return data.tarjetas

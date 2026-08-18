@@ -1150,7 +1150,6 @@ function ControlGastos({ user }) {
             <button className={`tab ${tab === 'unico' ? 'active' : ''}`} onClick={() => setTab('unico')}>Gasto único</button>
             <button className={`tab ${tab === 'fijo' ? 'active' : ''}`} onClick={() => setTab('fijo')}>Gasto fijo</button>
             <button className={`tab ${tab === 'cuota' ? 'active' : ''}`} onClick={() => setTab('cuota')}>Cuotas</button>
-            <button className={`tab ${tab === 'tc' ? 'active' : ''}`} onClick={() => setTab('tc')}>Gasto con TC</button>
           </div>
 
           {tab === 'unico' && (
@@ -1330,89 +1329,6 @@ function ControlGastos({ user }) {
             </div>
           )}
 
-          {tab === 'tc' && (
-            <div className="form-grid">
-              {data.tarjetas.length > 0 && (
-                <ul className="tarjeta-list">
-                  {data.tarjetas.map((t) => (
-                    <li key={t.id} className="tarjeta-chip">
-                      <Icon name="creditCard" size={13} />
-                      <span>{t.nombre} · corte {t.diaCorte}, pago {t.diaPago}</span>
-                      {confirmingId === `tarjeta__${t.id}` ? (
-                        <span className="confirm-group">
-                          <button className="icon-btn small" onClick={() => { removeTarjeta(t.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={13} /></button>
-                          <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={13} /></button>
-                        </span>
-                      ) : (
-                        <button className="icon-btn small danger" onClick={() => setConfirmingId(`tarjeta__${t.id}`)} aria-label="Eliminar tarjeta"><Icon name="trash" size={13} /></button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {!showAddTarjeta ? (
-                <button className="abono-link" onClick={() => setShowAddTarjeta(true)}>+ Agregar tarjeta</button>
-              ) : (
-                <div className="form-grid" style={{ background: 'var(--bg)', padding: 12, borderRadius: 10 }}>
-                  <input className="field" placeholder="Nombre de la tarjeta (ej. BAC Visa)" value={nombreTarjeta} onChange={(e) => setNombreTarjeta(e.target.value)} />
-                  <div className="monto-row">
-                    <input className="field" type="number" min="1" max="31" placeholder="Día de corte" value={diaCorteTarjeta} onChange={(e) => setDiaCorteTarjeta(e.target.value)} />
-                    <input className="field" type="number" min="1" max="31" placeholder="Día de pago" value={diaPagoTarjeta} onChange={(e) => setDiaPagoTarjeta(e.target.value)} />
-                  </div>
-                  <div className="monto-row">
-                    <button className="btn-add" style={{ flex: 1 }} onClick={addTarjeta} disabled={!nombreTarjeta.trim() || !diaCorteTarjeta || !diaPagoTarjeta}>
-                      <Icon name="plus" size={15} /> Guardar tarjeta
-                    </button>
-                    <button className="icon-btn" onClick={() => setShowAddTarjeta(false)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
-                  </div>
-                </div>
-              )}
-
-              {data.tarjetas.length === 0 ? (
-                <p className="empty-state">Agrega una tarjeta arriba para poder registrar gastos con ella.</p>
-              ) : (
-                <>
-                  <input className="field" placeholder="Nombre del gasto (ej. Amazon)" value={descTC} onChange={(e) => setDescTC(e.target.value)} />
-                  <select className="field" value={catTC} onChange={(e) => setCatTC(e.target.value)}>
-                    {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                  </select>
-                  <div className="monto-row">
-                    <input className="field" type="number" step="0.01" min="0" placeholder={monedaTC === 'USD' ? 'Monto ($)' : 'Monto (Q)'}
-                           value={montoTC} onChange={(e) => setMontoTC(e.target.value)} />
-                    <div className="currency-toggle">
-                      <button type="button" className={`currency-btn ${monedaTC === 'GTQ' ? 'active' : ''}`} onClick={() => setMonedaTC('GTQ')}>Q</button>
-                      <button type="button" className={`currency-btn ${monedaTC === 'USD' ? 'active' : ''}`} onClick={() => setMonedaTC('USD')}>$</button>
-                    </div>
-                  </div>
-                  <label className="field-label">
-                    Tarjeta
-                    <select className="field" value={tarjetaSeleccionada} onChange={(e) => setTarjetaSeleccionada(e.target.value)}>
-                      <option value="">Selecciona una tarjeta</option>
-                      {data.tarjetas.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                    </select>
-                  </label>
-                  <label className="field-label">
-                    Fecha de la compra
-                    <input className="field" type="date" value={fechaCompraTC} onChange={(e) => setFechaCompraTC(e.target.value)} />
-                  </label>
-                  {monedaTC === 'USD' && montoTC && parseFloat(montoTC) > 0 && (
-                    <p className="hint">≈ {formatQ(parseFloat(montoTC) * tcActual)} al tipo de cambio actual</p>
-                  )}
-                  {tarjetaSeleccionada && fechaCompraTC && (() => {
-                    const t = data.tarjetas.find((x) => x.id === tarjetaSeleccionada);
-                    if (!t) return null;
-                    const ciclo = calcularCicloTC(fechaCompraTC, t.diaCorte, t.diaPago);
-                    return (<p className="hint">Corte: {formatFechaCorta(ciclo.fechaCorte)} · Pago: {formatFechaCorta(ciclo.fechaPago)}</p>);
-                  })()}
-                  <button className="btn-add" onClick={addGastoTC}
-                          disabled={!descTC.trim() || !montoTC || parseFloat(montoTC) <= 0 || !tarjetaSeleccionada || !fechaCompraTC}>
-                    <Icon name="plus" size={16} /> Agregar gasto con TC
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="card">
@@ -1804,6 +1720,92 @@ function ControlGastos({ user }) {
 
         {view === 'tarjetas' && (
           <>
+          <div className="card">
+            <h2 className="section-title">Tus tarjetas</h2>
+            <p className="section-sub">Agrega tus tarjetas y registra gastos hechos con ellas.</p>
+            <div className="form-grid">
+              {data.tarjetas.length > 0 && (
+                <ul className="tarjeta-list">
+                  {data.tarjetas.map((t) => (
+                    <li key={t.id} className="tarjeta-chip">
+                      <Icon name="creditCard" size={13} />
+                      <span>{t.nombre} · corte {t.diaCorte}, pago {t.diaPago}</span>
+                      {confirmingId === `tarjeta__${t.id}` ? (
+                        <span className="confirm-group">
+                          <button className="icon-btn small" onClick={() => { removeTarjeta(t.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={13} /></button>
+                          <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={13} /></button>
+                        </span>
+                      ) : (
+                        <button className="icon-btn small danger" onClick={() => setConfirmingId(`tarjeta__${t.id}`)} aria-label="Eliminar tarjeta"><Icon name="trash" size={13} /></button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {!showAddTarjeta ? (
+                <button className="abono-link" onClick={() => setShowAddTarjeta(true)}>+ Agregar tarjeta</button>
+              ) : (
+                <div className="form-grid" style={{ background: 'var(--bg)', padding: 12, borderRadius: 10 }}>
+                  <input className="field" placeholder="Nombre de la tarjeta (ej. BAC Visa)" value={nombreTarjeta} onChange={(e) => setNombreTarjeta(e.target.value)} />
+                  <div className="monto-row">
+                    <input className="field" type="number" min="1" max="31" placeholder="Día de corte" value={diaCorteTarjeta} onChange={(e) => setDiaCorteTarjeta(e.target.value)} />
+                    <input className="field" type="number" min="1" max="31" placeholder="Día de pago" value={diaPagoTarjeta} onChange={(e) => setDiaPagoTarjeta(e.target.value)} />
+                  </div>
+                  <div className="monto-row">
+                    <button className="btn-add" style={{ flex: 1 }} onClick={addTarjeta} disabled={!nombreTarjeta.trim() || !diaCorteTarjeta || !diaPagoTarjeta}>
+                      <Icon name="plus" size={15} /> Guardar tarjeta
+                    </button>
+                    <button className="icon-btn" onClick={() => setShowAddTarjeta(false)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                  </div>
+                </div>
+              )}
+
+              {data.tarjetas.length === 0 ? (
+                <p className="empty-state">Agrega una tarjeta arriba para poder registrar gastos con ella.</p>
+              ) : (
+                <>
+                  <input className="field" placeholder="Nombre del gasto (ej. Amazon)" value={descTC} onChange={(e) => setDescTC(e.target.value)} />
+                  <select className="field" value={catTC} onChange={(e) => setCatTC(e.target.value)}>
+                    {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                  <div className="monto-row">
+                    <input className="field" type="number" step="0.01" min="0" placeholder={monedaTC === 'USD' ? 'Monto ($)' : 'Monto (Q)'}
+                           value={montoTC} onChange={(e) => setMontoTC(e.target.value)} />
+                    <div className="currency-toggle">
+                      <button type="button" className={`currency-btn ${monedaTC === 'GTQ' ? 'active' : ''}`} onClick={() => setMonedaTC('GTQ')}>Q</button>
+                      <button type="button" className={`currency-btn ${monedaTC === 'USD' ? 'active' : ''}`} onClick={() => setMonedaTC('USD')}>$</button>
+                    </div>
+                  </div>
+                  <label className="field-label">
+                    Tarjeta
+                    <select className="field" value={tarjetaSeleccionada} onChange={(e) => setTarjetaSeleccionada(e.target.value)}>
+                      <option value="">Selecciona una tarjeta</option>
+                      {data.tarjetas.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    Fecha de la compra
+                    <input className="field" type="date" value={fechaCompraTC} onChange={(e) => setFechaCompraTC(e.target.value)} />
+                  </label>
+                  {monedaTC === 'USD' && montoTC && parseFloat(montoTC) > 0 && (
+                    <p className="hint">≈ {formatQ(parseFloat(montoTC) * tcActual)} al tipo de cambio actual</p>
+                  )}
+                  {tarjetaSeleccionada && fechaCompraTC && (() => {
+                    const t = data.tarjetas.find((x) => x.id === tarjetaSeleccionada);
+                    if (!t) return null;
+                    const ciclo = calcularCicloTC(fechaCompraTC, t.diaCorte, t.diaPago);
+                    return (<p className="hint">Corte: {formatFechaCorta(ciclo.fechaCorte)} · Pago: {formatFechaCorta(ciclo.fechaPago)}</p>);
+                  })()}
+                  <button className="btn-add" onClick={addGastoTC}
+                          disabled={!descTC.trim() || !montoTC || parseFloat(montoTC) <= 0 || !tarjetaSeleccionada || !fechaCompraTC}>
+                    <Icon name="plus" size={16} /> Agregar gasto con TC
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
           {(todosGastosTC.length > 0 || data.tarjetas.length > 0) && (
             <div className="card">
               <h2 className="section-title">Tarjetas de crédito</h2>
@@ -2051,12 +2053,6 @@ function ControlGastos({ user }) {
               )}
             </div>
           )}
-            {todosGastosTC.length === 0 && data.tarjetas.length === 0 && (
-              <div className="card">
-                <h2 className="section-title">Tarjetas de crédito</h2>
-                <p className="empty-state">Aún no tienes tarjetas registradas. Agrega una desde la pestaña "Gasto con TC" en Inicio.</p>
-              </div>
-            )}
           </>
         )}
       </div>

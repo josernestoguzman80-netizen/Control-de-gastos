@@ -93,6 +93,10 @@ const ICON_PATHS = {
   creditCard: <><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></>,
   mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 6l10 7 10-7" /></>,
   logOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>,
+  settings: <>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+  </>,
   google: <>
     <path fill="#4285F4" stroke="none" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
     <path fill="#34A853" stroke="none" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
@@ -595,6 +599,10 @@ function ControlGastos({ user }) {
   const [nombreTarjeta, setNombreTarjeta] = useState('');
   const [diaCorteTarjeta, setDiaCorteTarjeta] = useState('');
   const [diaPagoTarjeta, setDiaPagoTarjeta] = useState('');
+  const [editandoTarjetaId, setEditandoTarjetaId] = useState(null);
+  const [editTarjetaNombre, setEditTarjetaNombre] = useState('');
+  const [editTarjetaCorte, setEditTarjetaCorte] = useState('');
+  const [editTarjetaPago, setEditTarjetaPago] = useState('');
   const [tarjetaSeleccionada, setTarjetaSeleccionada] = useState('');
   const [descTC, setDescTC] = useState('');
   const [catTC, setCatTC] = useState(CATEGORIAS[0].id);
@@ -686,7 +694,7 @@ function ControlGastos({ user }) {
     });
   }, [personalizarCuotas, numCuotas]);
   useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); }, [currentMonth]);
-  useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); }, [view]);
+  useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); setEditandoTarjetaId(null); }, [view]);
 
   const gastosUnicosMes = useMemo(() => data.gastos.filter((g) => g.mes === currentMonth).sort((a, b) => (a.dia || 999) - (b.dia || 999)), [data.gastos, currentMonth]);
   const cuotasActivasMes = useMemo(() => getCuotasActivas(data.cuotas, currentMonth), [data.cuotas, currentMonth]);
@@ -790,6 +798,21 @@ function ControlGastos({ user }) {
     [data.tarjetas, data.pagosTarjeta]
   );
 
+  const deudaPorTarjeta = useMemo(() => {
+    return data.tarjetas.map((t) => {
+      const pagoMes = getTotalTarjetaMes(t, data, currentMonth);
+      const pendienteCuotas = compromisosFuturos
+        .filter((c) => c.tarjetaId === t.id)
+        .reduce((a, c) => a + c.montoRestante, 0);
+      return { id: t.id, nombre: t.nombre, pagoMes, pendienteCuotas, total: pagoMes + pendienteCuotas };
+    });
+  }, [data.tarjetas, data, currentMonth, compromisosFuturos]);
+  const cuotasSinTarjeta = useMemo(
+    () => compromisosFuturos.filter((c) => !c.tarjetaId).reduce((a, c) => a + c.montoRestante, 0),
+    [compromisosFuturos]
+  );
+  const deudaTotal = deudaPorTarjeta.reduce((a, t) => a + t.total, 0) + cuotasSinTarjeta;
+
   function changeMonth(delta) { setCurrentMonth((m) => addMonths(m, delta)); }
 
   function addGastoUnico() {
@@ -881,6 +904,16 @@ function ControlGastos({ user }) {
   function removeTarjeta(id) {
     setData((prev) => ({ ...prev, tarjetas: prev.tarjetas.filter((t) => t.id !== id), gastosTC: prev.gastosTC.filter((g) => g.tarjetaId !== id) }));
     if (tarjetaSeleccionada === id) setTarjetaSeleccionada('');
+  }
+  function guardarEdicionTarjeta(id) {
+    const corte = parseInt(editTarjetaCorte, 10);
+    const pago = parseInt(editTarjetaPago, 10);
+    if (!editTarjetaNombre.trim() || !corte || corte < 1 || corte > 31 || !pago || pago < 1 || pago > 31) return;
+    setData((prev) => ({
+      ...prev,
+      tarjetas: prev.tarjetas.map((t) => t.id === id ? { ...t, nombre: editTarjetaNombre.trim(), diaCorte: corte, diaPago: pago } : t),
+    }));
+    setEditandoTarjetaId(null);
   }
   function addGastoTC() {
     const monto = parseFloat(montoTC);
@@ -1568,15 +1601,7 @@ function ControlGastos({ user }) {
         )}
 
         <div className="footer-row">
-          {confirmReset ? (
-            <div className="reset-confirm">
-              <span>¿Borrar todos los datos? No se puede deshacer.</span>
-              <button className="btn-add danger small" onClick={confirmResetAll}>Sí, borrar todo</button>
-              <button className="icon-btn small" onClick={() => setConfirmReset(false)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
-            </div>
-          ) : (
-            <button className="link-btn" onClick={() => setConfirmReset(true)}>Borrar todos los datos</button>
-          )}
+          <button className="link-btn" onClick={() => setView('ajustes')}>Ver configuración</button>
         </div>
         </>
         )}
@@ -1731,6 +1756,50 @@ function ControlGastos({ user }) {
 
         {view === 'tarjetas' && (
           <>
+          {(data.tarjetas.length > 0 || compromisosFuturos.length > 0) && (
+            <div className="card">
+              <h2 className="section-title">Deuda total</h2>
+              <p className="section-sub">Lo que debes en total, dividido por tarjeta.</p>
+              <div className="saldo-highlight">
+                <div className="balance-line no-pad">
+                  <span className="label total-label">Debes en total</span>
+                  <span className="amount-mono big negative">{formatQ(deudaTotal)}</span>
+                </div>
+              </div>
+              {deudaPorTarjeta.length > 0 && (
+                <ul className="ledger-list" style={{ marginTop: 6 }}>
+                  {deudaPorTarjeta.map((t) => (
+                    <li key={t.id} className="ledger-row">
+                      <div className="row-main">
+                        <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
+                        <div>
+                          <div className="row-desc">{t.nombre}</div>
+                          <p className="meta-detail">
+                            {formatQ(t.pagoMes)} este mes
+                            {t.pendienteCuotas > 0 && ` + ${formatQ(t.pendienteCuotas)} en cuotas futuras`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="row-actions">
+                        <span className="amount-mono negative">{formatQ(t.total)}</span>
+                      </div>
+                    </li>
+                  ))}
+                  {cuotasSinTarjeta > 0 && (
+                    <li className="ledger-row">
+                      <div className="row-main">
+                        <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
+                        <div className="row-desc">Cuotas sin tarjeta asociada</div>
+                      </div>
+                      <div className="row-actions">
+                        <span className="amount-mono negative">{formatQ(cuotasSinTarjeta)}</span>
+                      </div>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="card">
             <h2 className="section-title">Tus tarjetas</h2>
             <p className="section-sub">Agrega tus tarjetas y registra gastos hechos con ellas.</p>
@@ -1830,15 +1899,16 @@ function ControlGastos({ user }) {
                     const meses = getMesesConCargos(t, data, currentMonth);
                     const abierta = !!tarjetasAbiertas[t.id];
                     return (
-                      <li key={t.id} className="ledger-row">
+                      <React.Fragment key={t.id}>
+                      <li className="ledger-row">
                         <div className="row-main">
                           <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
                           <div className="cuota-body">
                             <div className="row-desc">{t.nombre}</div>
                             <p className="meta-detail">
-                              Pago de este mes: {formatQD(totalMesActual, tcActual)}
-                              {resumen.ajusteAcumulado > 0 && ` · ${formatQD(resumen.ajusteAcumulado, tcActual)} a favor`}
-                              {resumen.ajusteAcumulado < 0 && ` · debes ${formatQD(-resumen.ajusteAcumulado, tcActual)} adicional`}
+                              Pago de este mes: {formatQ(totalMesActual)}
+                              {resumen.ajusteAcumulado > 0 && ` · ${formatQ(resumen.ajusteAcumulado)} a favor`}
+                              {resumen.ajusteAcumulado < 0 && ` · debes ${formatQ(-resumen.ajusteAcumulado)} adicional`}
                             </p>
                             {pagoTarjetaFormId === t.id ? (
                               <div className="abono-form">
@@ -1895,142 +1965,138 @@ function ControlGastos({ user }) {
                           </div>
                         </div>
                       </li>
+                      {abierta && meses.length > 0 && (
+                        <li className="tarjeta-meses-li">
+                          <div className="tarjeta-meses-wrap">
+                            {meses.map((mes) => {
+                              const mesKey = `${t.id}__${mes}`;
+                              const mesAbierto = !!mesesTarjetaAbiertos[mesKey];
+                              const totalMes = getTotalTarjetaMes(t, data, mes);
+                              const entradas = mesAbierto ? getEntradasTarjetaMes(t, data, mes) : [];
+                              return (
+                                <div key={mes} className="tarjeta-mes-group">
+                                  <button className="tarjeta-mes-toggle" onClick={() => toggleMesTarjeta(t.id, mes)}>
+                                    <Icon name="chevronDown" size={14} style={mesAbierto ? { transform: 'rotate(180deg)' } : {}} />
+                                    <span className="tarjeta-mes-nombre">{monthLabel(mes)}</span>
+                                    <span className="amount-mono small">{formatQ(totalMes)}</span>
+                                  </button>
+                                  {mesAbierto && (
+                                    <ul className="ledger-list tarjeta-compras-list">
+                                      {entradas.map((e) => {
+                                        if (e.tipo === 'cuota') {
+                                          const c = e.item;
+                                          return (
+                                            <li key={`cuota-${c.id}`} className="ledger-row">
+                                              <div className="row-main">
+                                                <CategoryBadge id={c.categoria} />
+                                                <DayBadge dia={c.dia} />
+                                                <div className="row-desc">
+                                                  {c.descripcion} <span className="pill pill-cuota">Cuota {c.cuotaActual}/{c.numCuotas}</span>
+                                                </div>
+                                              </div>
+                                              <div className="row-actions">
+                                                <span className="amount-mono negative">-{formatQ(c.montoCuota)}</span>
+                                              </div>
+                                            </li>
+                                          );
+                                        }
+                                        if (e.tipo === 'unico') {
+                                          const g = e.item;
+                                          return (
+                                            <li key={`unico-${g.id}`} className="ledger-row">
+                                              <div className="row-main">
+                                                <CategoryBadge id={g.categoria} />
+                                                <DayBadge dia={g.dia} />
+                                                <div className="row-desc">
+                                                  {g.descripcion}
+                                                  {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
+                                                </div>
+                                              </div>
+                                              <div className="row-actions">
+                                                <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                              </div>
+                                            </li>
+                                          );
+                                        }
+                                        if (e.tipo === 'fijo') {
+                                          const f = e.item;
+                                          return (
+                                            <li key={`fijo-${f.id}`} className="ledger-row">
+                                              <div className="row-main">
+                                                <CategoryBadge id={f.categoria} />
+                                                <DayBadge dia={f.dia} />
+                                                <div className="row-desc">
+                                                  {f.descripcion} <span className="pill">Fijo</span>
+                                                  {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
+                                                </div>
+                                              </div>
+                                              <div className="row-actions">
+                                                <span className="amount-mono negative">-{formatQ(f.monto)}</span>
+                                              </div>
+                                            </li>
+                                          );
+                                        }
+                                        const g = e.item;
+                                        return (
+                                          <li key={g.id} className="ledger-row">
+                                            <div className="row-main">
+                                              <CategoryBadge id={g.categoria} />
+                                              <DayBadge dia={e.dia} />
+                                              <div>
+                                                <div className="row-desc">
+                                                  {g.descripcion}
+                                                  {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
+                                                </div>
+                                                <p className="meta-detail">Corte: {formatFechaCorta(e.ciclo.fechaCorte)} · Pago: {formatFechaCorta(e.ciclo.fechaPago)}</p>
+                                                {editandoGastoTCId === g.id && (
+                                                  <div className="abono-form">
+                                                    <input
+                                                      type="number" step="0.01" min="0" autoFocus
+                                                      className="abono-input"
+                                                      placeholder={g.moneda === 'USD' ? 'Monto ($)' : 'Monto (Q)'}
+                                                      value={editGastoTCMonto}
+                                                      onChange={(e2) => setEditGastoTCMonto(e2.target.value)}
+                                                      onKeyDown={(e2) => { if (e2.key === 'Enter') guardarEdicionGastoTC(g.id); if (e2.key === 'Escape') setEditandoGastoTCId(null); }}
+                                                    />
+                                                    <button className="icon-btn small" onClick={() => guardarEdicionGastoTC(g.id)} aria-label="Guardar"><Icon name="check" size={16} /></button>
+                                                    <button className="icon-btn small" onClick={() => setEditandoGastoTCId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                                                  </div>
+                                                )}
+                                                {editandoGastoTCId === g.id && g.moneda === 'USD' && editGastoTCMonto && parseFloat(editGastoTCMonto) > 0 && (
+                                                  <p className="hint">≈ {formatQ(parseFloat(editGastoTCMonto) * tcActual)} con la tasa actual (Q{tcActual})</p>
+                                                )}
+                                              </div>
+                                            </div>
+                                            {editandoGastoTCId !== g.id && (
+                                              <div className="row-actions">
+                                                <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                                <button className="icon-btn small" onClick={() => iniciarEdicionGastoTC(g)} aria-label="Editar monto"><Icon name="pencil" size={13} /></button>
+                                                {confirmingId === `tc__${g.id}` ? (
+                                                  <span className="confirm-group">
+                                                    <button className="icon-btn small" onClick={() => { removeGastoTC(g.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
+                                                    <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                                                  </span>
+                                                ) : (
+                                                  <button className="icon-btn small danger" onClick={() => setConfirmingId(`tc__${g.id}`)} aria-label="Eliminar gasto con TC"><Icon name="trash" size={14} /></button>
+                                                )}
+                                              </div>
+                                            )}
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </li>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </ul>
               )}
-
-              {data.tarjetas.map((t) => {
-                const abierta = !!tarjetasAbiertas[t.id];
-                if (!abierta) return null;
-                const meses = getMesesConCargos(t, data, currentMonth);
-                if (meses.length === 0) return null;
-                return (
-                  <div key={`meses-${t.id}`} className="tarjeta-meses-wrap">
-                    {meses.map((mes) => {
-                      const mesKey = `${t.id}__${mes}`;
-                      const mesAbierto = !!mesesTarjetaAbiertos[mesKey];
-                      const totalMes = getTotalTarjetaMes(t, data, mes);
-                      const entradas = mesAbierto ? getEntradasTarjetaMes(t, data, mes) : [];
-                      return (
-                        <div key={mes} className="tarjeta-mes-group">
-                          <button className="tarjeta-mes-toggle" onClick={() => toggleMesTarjeta(t.id, mes)}>
-                            <Icon name="chevronDown" size={14} style={mesAbierto ? { transform: 'rotate(180deg)' } : {}} />
-                            <span className="tarjeta-mes-nombre">{monthLabel(mes)}</span>
-                            <span className="amount-mono small">{formatQD(totalMes, tcActual)}</span>
-                          </button>
-                          {mesAbierto && (
-                            <ul className="ledger-list tarjeta-compras-list">
-                              {entradas.map((e) => {
-                                if (e.tipo === 'cuota') {
-                                  const c = e.item;
-                                  return (
-                                    <li key={`cuota-${c.id}`} className="ledger-row">
-                                      <div className="row-main">
-                                        <CategoryBadge id={c.categoria} />
-                                        <DayBadge dia={c.dia} />
-                                        <div className="row-desc">
-                                          {c.descripcion} <span className="pill pill-cuota">Cuota {c.cuotaActual}/{c.numCuotas}</span>
-                                        </div>
-                                      </div>
-                                      <div className="row-actions">
-                                        <span className="amount-mono negative">-{formatQ(c.montoCuota)}</span>
-                                      </div>
-                                    </li>
-                                  );
-                                }
-                                if (e.tipo === 'unico') {
-                                  const g = e.item;
-                                  return (
-                                    <li key={`unico-${g.id}`} className="ledger-row">
-                                      <div className="row-main">
-                                        <CategoryBadge id={g.categoria} />
-                                        <DayBadge dia={g.dia} />
-                                        <div className="row-desc">
-                                          {g.descripcion}
-                                          {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
-                                        </div>
-                                      </div>
-                                      <div className="row-actions">
-                                        <span className="amount-mono negative">-{formatQ(g.monto)}</span>
-                                      </div>
-                                    </li>
-                                  );
-                                }
-                                if (e.tipo === 'fijo') {
-                                  const f = e.item;
-                                  return (
-                                    <li key={`fijo-${f.id}`} className="ledger-row">
-                                      <div className="row-main">
-                                        <CategoryBadge id={f.categoria} />
-                                        <DayBadge dia={f.dia} />
-                                        <div className="row-desc">
-                                          {f.descripcion} <span className="pill">Fijo</span>
-                                          {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
-                                        </div>
-                                      </div>
-                                      <div className="row-actions">
-                                        <span className="amount-mono negative">-{formatQ(f.monto)}</span>
-                                      </div>
-                                    </li>
-                                  );
-                                }
-                                const g = e.item;
-                                return (
-                                  <li key={g.id} className="ledger-row">
-                                    <div className="row-main">
-                                      <CategoryBadge id={g.categoria} />
-                                      <DayBadge dia={e.dia} />
-                                      <div>
-                                        <div className="row-desc">
-                                          {g.descripcion}
-                                          {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
-                                        </div>
-                                        <p className="meta-detail">Corte: {formatFechaCorta(e.ciclo.fechaCorte)} · Pago: {formatFechaCorta(e.ciclo.fechaPago)}</p>
-                                        {editandoGastoTCId === g.id && (
-                                          <div className="abono-form">
-                                            <input
-                                              type="number" step="0.01" min="0" autoFocus
-                                              className="abono-input"
-                                              placeholder={g.moneda === 'USD' ? 'Monto ($)' : 'Monto (Q)'}
-                                              value={editGastoTCMonto}
-                                              onChange={(e2) => setEditGastoTCMonto(e2.target.value)}
-                                              onKeyDown={(e2) => { if (e2.key === 'Enter') guardarEdicionGastoTC(g.id); if (e2.key === 'Escape') setEditandoGastoTCId(null); }}
-                                            />
-                                            <button className="icon-btn small" onClick={() => guardarEdicionGastoTC(g.id)} aria-label="Guardar"><Icon name="check" size={16} /></button>
-                                            <button className="icon-btn small" onClick={() => setEditandoGastoTCId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
-                                          </div>
-                                        )}
-                                        {editandoGastoTCId === g.id && g.moneda === 'USD' && editGastoTCMonto && parseFloat(editGastoTCMonto) > 0 && (
-                                          <p className="hint">≈ {formatQ(parseFloat(editGastoTCMonto) * tcActual)} con la tasa actual (Q{tcActual})</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {editandoGastoTCId !== g.id && (
-                                      <div className="row-actions">
-                                        <span className="amount-mono negative">-{formatQ(g.monto)}</span>
-                                        <button className="icon-btn small" onClick={() => iniciarEdicionGastoTC(g)} aria-label="Editar monto"><Icon name="pencil" size={13} /></button>
-                                        {confirmingId === `tc__${g.id}` ? (
-                                          <span className="confirm-group">
-                                            <button className="icon-btn small" onClick={() => { removeGastoTC(g.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
-                                            <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
-                                          </span>
-                                        ) : (
-                                          <button className="icon-btn small danger" onClick={() => setConfirmingId(`tc__${g.id}`)} aria-label="Eliminar gasto con TC"><Icon name="trash" size={14} /></button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
 
               {historialPagosTarjeta.length > 0 && (
                 <>
@@ -2066,6 +2132,79 @@ function ControlGastos({ user }) {
           )}
           </>
         )}
+
+        {view === 'ajustes' && (
+          <>
+          {data.tarjetas.length > 0 && (
+            <div className="card">
+              <h2 className="section-title">Tus tarjetas</h2>
+              <p className="section-sub">Edita el nombre, día de corte y día de pago, o elimina una tarjeta.</p>
+              <ul className="ledger-list">
+                {data.tarjetas.map((t) => (
+                  <li key={t.id} className="ledger-row">
+                    {editandoTarjetaId === t.id ? (
+                      <div className="form-grid" style={{ width: '100%' }}>
+                        <input className="field" placeholder="Nombre de la tarjeta" value={editTarjetaNombre} onChange={(e) => setEditTarjetaNombre(e.target.value)} />
+                        <div className="monto-row">
+                          <input className="field" type="number" min="1" max="31" placeholder="Día de corte" value={editTarjetaCorte} onChange={(e) => setEditTarjetaCorte(e.target.value)} />
+                          <input className="field" type="number" min="1" max="31" placeholder="Día de pago" value={editTarjetaPago} onChange={(e) => setEditTarjetaPago(e.target.value)} />
+                        </div>
+                        <div className="monto-row">
+                          <button className="btn-add" style={{ flex: 1 }} onClick={() => guardarEdicionTarjeta(t.id)}
+                                  disabled={!editTarjetaNombre.trim() || !editTarjetaCorte || !editTarjetaPago}>
+                            <Icon name="check" size={15} /> Guardar
+                          </button>
+                          <button className="icon-btn" onClick={() => setEditandoTarjetaId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="row-main">
+                          <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
+                          <div className="row-desc">
+                            {t.nombre} <span className="cat-name">corte {t.diaCorte}, pago {t.diaPago}</span>
+                          </div>
+                        </div>
+                        <div className="row-actions">
+                          <button className="icon-btn small" onClick={() => {
+                            setEditTarjetaNombre(t.nombre); setEditTarjetaCorte(String(t.diaCorte)); setEditTarjetaPago(String(t.diaPago)); setEditandoTarjetaId(t.id);
+                          }} aria-label="Editar tarjeta"><Icon name="pencil" size={13} /></button>
+                          {confirmingId === `ajustes-tarjeta__${t.id}` ? (
+                            <span className="confirm-group">
+                              <button className="icon-btn small" onClick={() => { removeTarjeta(t.id); setConfirmingId(null); }} aria-label="Confirmar eliminar"><Icon name="check" size={14} /></button>
+                              <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                            </span>
+                          ) : (
+                            <button className="icon-btn small danger" onClick={() => setConfirmingId(`ajustes-tarjeta__${t.id}`)} aria-label="Eliminar tarjeta"><Icon name="trash" size={14} /></button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="card">
+            <h2 className="section-title">Configuración</h2>
+            <p className="section-sub">Ajustes generales de la app.</p>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-title">Borrar todos los datos</div>
+                <p className="meta-detail">Elimina ingresos, gastos, cuotas, metas y tarjetas. No se puede deshacer.</p>
+              </div>
+              {confirmReset ? (
+                <span className="confirm-group">
+                  <button className="btn-add danger small" onClick={confirmResetAll}>Sí, borrar todo</button>
+                  <button className="icon-btn small" onClick={() => setConfirmReset(false)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                </span>
+              ) : (
+                <button className="btn-add danger small" onClick={() => setConfirmReset(true)}>Borrar todo</button>
+              )}
+            </div>
+          </div>
+          </>
+        )}
       </div>
 
       <nav className="tab-bar" ref={navRef}>
@@ -2081,6 +2220,9 @@ function ControlGastos({ user }) {
           </button>
           <button className={`tab-bar-btn ${view === 'tarjetas' ? 'active' : ''}`} onClick={() => setView('tarjetas')}>
             <Icon name="creditCard" size={20} /><span>Tarjetas</span>
+          </button>
+          <button className={`tab-bar-btn ${view === 'ajustes' ? 'active' : ''}`} onClick={() => setView('ajustes')}>
+            <Icon name="settings" size={20} /><span>Ajustes</span>
           </button>
         </div>
       </nav>
@@ -2242,6 +2384,8 @@ const STYLES = `
 .ledger-list { list-style:none; margin:0; padding:0; }
 .ledger-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap:10px; animation: fadeIn 0.3s ease both; }
 .ledger-row:last-child { border-bottom:none; }
+.ledger-list > li:last-child { border-bottom:none; }
+.tarjeta-meses-li + .ledger-row { border-top:1px solid var(--border); }
 @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
 .row-main { display:flex; align-items:center; gap:12px; min-width:0; }
 .cat-badge { border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -2262,7 +2406,8 @@ const STYLES = `
 
 .abono-link { background:none; border:none; color:var(--accent); font-size:11.5px; padding:6px 0 0; margin:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
 .tarjeta-toggle-btn { display:flex; align-items:center; gap:4px; background:none; border:none; color:var(--text-secondary); font-size:11.5px; font-weight:600; padding:8px 0 0; margin:0; cursor:pointer; font-family:'Inter', sans-serif; }
-.tarjeta-meses-wrap { margin-top:4px; }
+.tarjeta-meses-li { display: block; padding: 0; }
+.tarjeta-meses-wrap { margin-top:-6px; margin-bottom:4px; padding:6px 0 4px 46px; }
 .tarjeta-mes-group { border-top:1px solid var(--border); }
 .tarjeta-mes-toggle { display:flex; align-items:center; gap:8px; width:100%; background:none; border:none; color:var(--text); padding:12px 0; cursor:pointer; font-family:'Inter', sans-serif; }
 .tarjeta-mes-toggle svg { color:var(--text-secondary); transition: transform 0.15s ease; flex-shrink:0; }
@@ -2294,6 +2439,8 @@ const STYLES = `
 .legend-pct { font-size:11.5px; color:var(--text-secondary); min-width:32px; text-align:right; }
 
 .footer-row { text-align:center; margin-top:24px; }
+.settings-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-top:1px solid var(--border); }
+.settings-row-title { font-size:14px; color:var(--text); font-weight:600; }
 
 .tab-bar {
   position:fixed; bottom:0; left:0; right:0;

@@ -295,12 +295,18 @@ function simularTarjeta(tarjeta, gastosTC, pagosTarjeta, hastaMes) {
     const esperadoEfectivo = Math.max(esperadoOriginal - ajuste, 0);
     const pagoRegistrado = pagadoPorMes[mes];
     const montoDelMes = pagoRegistrado !== undefined ? pagoRegistrado : esperadoEfectivo;
-    if (mes === hastaMes) { montoDelMesObjetivo = montoDelMes; esperadoDelMesObjetivo = esperadoEfectivo; }
+    if (mes === hastaMes) {
+      // Lo que se muestra es lo que FALTA pagar este ciclo (esperado menos lo ya pagado),
+      // nunca lo que pagaste directamente — así un pago (o dos) siempre resta, no suma.
+      montoDelMesObjetivo = pagoRegistrado !== undefined ? Math.max(esperadoEfectivo - pagoRegistrado, 0) : esperadoEfectivo;
+      esperadoDelMesObjetivo = esperadoEfectivo;
+    }
     ajuste = ajuste + (montoDelMes - esperadoOriginal);
     mes = addMonths(mes, 1);
     guard++;
   }
   return { montoDelMes: montoDelMesObjetivo, esperadoDelMes: esperadoDelMesObjetivo, ajusteAcumulado: ajuste };
+
 }
 function getTotalGastosMes(data, monthK) {
   const unicos = data.gastos.filter((g) => g.mes === monthK).reduce((a, g) => a + g.monto, 0);
@@ -374,12 +380,56 @@ function getEntradasTarjetaMes(tarjeta, data, mes) {
   });
   return entradas.sort((a, b) => a.dia - b.dia);
 }
+function getResumenTarjetaMes(tarjeta, data, hastaMes) {
+  // Junta TODO lo que se le carga a esta tarjeta cada mes: compras con TC (según su ciclo
+  // de corte/pago), gastos únicos, gastos fijos y cuotas asignados a esta tarjeta (estos se
+  // cobran el mes en que ocurren, sin ciclo de corte). Así un pago registrado descuenta de
+  // TODO lo anterior junto, no solo de las compras con TC.
+  const esperadoPorMes = {};
+  function add(mesClave, monto) { esperadoPorMes[mesClave] = (esperadoPorMes[mesClave] || 0) + monto; }
+  data.gastosTC.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => {
+    const ciclo = calcularCicloTC(g.fechaCompra, tarjeta.diaCorte, tarjeta.diaPago);
+    add(ciclo.mesPago, g.monto);
+  });
+  data.gastos.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => add(g.mes, g.monto));
+  data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id).forEach((f) => {
+    let m = f.mesInicio, guard = 0;
+    while (m <= hastaMes && guard < 600) {
+      if (gastoFijoActivoEnMes(f, m)) add(m, f.monto);
+      m = addMonths(m, 1);
+      guard++;
+    }
+  });
+  data.cuotas.filter((c) => c.tarjetaId === tarjeta.id).forEach((c) => {
+    simularCuota(c).forEach((p) => add(p.mes, p.monto));
+  });
+
+  const pagadoPorMes = {};
+  (data.pagosTarjeta || []).filter((p) => p.tarjetaId === tarjeta.id).forEach((p) => {
+    const mesClave = p.fecha ? p.fecha.slice(0, 7) : p.mes;
+    pagadoPorMes[mesClave] = (pagadoPorMes[mesClave] || 0) + p.monto;
+  });
+
+  const todosMeses = [...new Set([...Object.keys(esperadoPorMes), ...Object.keys(pagadoPorMes)])].sort();
+  if (todosMeses.length === 0 || hastaMes < todosMeses[0]) return { montoDelMes: 0, esperadoDelMes: 0, ajusteAcumulado: 0 };
+  let ajuste = 0, mes = todosMeses[0], montoDelMesObjetivo = 0, esperadoDelMesObjetivo = 0, guard = 0;
+  while (mes <= hastaMes && guard < 1200) {
+    const esperadoOriginal = esperadoPorMes[mes] || 0;
+    const esperadoEfectivo = Math.max(esperadoOriginal - ajuste, 0);
+    const pagoRegistrado = pagadoPorMes[mes];
+    const montoDelMes = pagoRegistrado !== undefined ? pagoRegistrado : esperadoEfectivo;
+    if (mes === hastaMes) {
+      montoDelMesObjetivo = pagoRegistrado !== undefined ? Math.max(esperadoEfectivo - pagoRegistrado, 0) : esperadoEfectivo;
+      esperadoDelMesObjetivo = esperadoEfectivo;
+    }
+    ajuste = ajuste + (montoDelMes - esperadoOriginal);
+    mes = addMonths(mes, 1);
+    guard++;
+  }
+  return { montoDelMes: montoDelMesObjetivo, esperadoDelMes: esperadoDelMesObjetivo, ajusteAcumulado: ajuste };
+}
 function getTotalTarjetaMes(tarjeta, data, mes) {
-  const resumenTC = simularTarjeta(tarjeta, data.gastosTC, data.pagosTarjeta || [], mes).montoDelMes;
-  const fijos = data.gastosFijos.filter((f) => f.tarjetaId === tarjeta.id && gastoFijoActivoEnMes(f, mes)).reduce((a, f) => a + f.monto, 0);
-  const unicos = data.gastos.filter((g) => g.tarjetaId === tarjeta.id && g.mes === mes).reduce((a, g) => a + g.monto, 0);
-  const cuotas = getCuotasActivas(data.cuotas.filter((c) => c.tarjetaId === tarjeta.id), mes).reduce((a, c) => a + c.montoCuota, 0);
-  return resumenTC + fijos + unicos + cuotas;
+  return getResumenTarjetaMes(tarjeta, data, mes).montoDelMes;
 }
 
 /* ============================== INSIGNIAS ============================== */
@@ -801,17 +851,14 @@ function ControlGastos({ user }) {
   const deudaPorTarjeta = useMemo(() => {
     return data.tarjetas.map((t) => {
       const pagoMes = getTotalTarjetaMes(t, data, currentMonth);
-      const pendienteCuotas = compromisosFuturos
-        .filter((c) => c.tarjetaId === t.id)
-        .reduce((a, c) => a + c.montoRestante, 0);
-      return { id: t.id, nombre: t.nombre, pagoMes, pendienteCuotas, total: pagoMes + pendienteCuotas };
+      const pagadoMes = (data.pagosTarjeta || [])
+        .filter((p) => p.tarjetaId === t.id && (p.fecha ? p.fecha.slice(0, 7) : p.mes) === currentMonth)
+        .reduce((a, p) => a + p.monto, 0);
+      return { id: t.id, nombre: t.nombre, total: pagoMes, pagadoMes };
     });
-  }, [data.tarjetas, data, currentMonth, compromisosFuturos]);
-  const cuotasSinTarjeta = useMemo(
-    () => compromisosFuturos.filter((c) => !c.tarjetaId).reduce((a, c) => a + c.montoRestante, 0),
-    [compromisosFuturos]
-  );
-  const deudaTotal = deudaPorTarjeta.reduce((a, t) => a + t.total, 0) + cuotasSinTarjeta;
+  }, [data.tarjetas, data, currentMonth]);
+  const deudaTotal = deudaPorTarjeta.reduce((a, t) => a + t.total, 0);
+  const pagadoEsteMesTotal = deudaPorTarjeta.reduce((a, t) => a + t.pagadoMes, 0);
 
   function changeMonth(delta) { setCurrentMonth((m) => addMonths(m, delta)); }
 
@@ -1485,7 +1532,6 @@ function ControlGastos({ user }) {
                         {t.montoDelMes !== t.esperadoDelMes && <span className="pill pill-abono">ajustado</span>}
                       </div>
                       {t.ajusteAcumulado > 0 && <p className="meta-detail">Te queda {formatQ(t.ajusteAcumulado)} a favor para el próximo mes</p>}
-                      {t.ajusteAcumulado < 0 && <p className="meta-detail">Debes {formatQ(-t.ajusteAcumulado)} adicional</p>}
                     </div>
                   </div>
                   <div className="row-actions">
@@ -1756,15 +1802,18 @@ function ControlGastos({ user }) {
 
         {view === 'tarjetas' && (
           <>
-          {(data.tarjetas.length > 0 || compromisosFuturos.length > 0) && (
+          {data.tarjetas.length > 0 && (
             <div className="card">
               <h2 className="section-title">Deuda total</h2>
-              <p className="section-sub">Lo que debes en total, dividido por tarjeta.</p>
+              <p className="section-sub">Lo que debes pagar este mes, dividido por tarjeta.</p>
               <div className="saldo-highlight">
                 <div className="balance-line no-pad">
                   <span className="label total-label">Debes en total</span>
                   <span className="amount-mono big negative">{formatQ(deudaTotal)}</span>
                 </div>
+                {pagadoEsteMesTotal > 0 && (
+                  <p className="balance-note">Ya pagaste {formatQ(pagadoEsteMesTotal)} este mes.</p>
+                )}
               </div>
               {deudaPorTarjeta.length > 0 && (
                 <ul className="ledger-list" style={{ marginTop: 6 }}>
@@ -1774,10 +1823,7 @@ function ControlGastos({ user }) {
                         <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
                         <div>
                           <div className="row-desc">{t.nombre}</div>
-                          <p className="meta-detail">
-                            {formatQ(t.pagoMes)} este mes
-                            {t.pendienteCuotas > 0 && ` + ${formatQ(t.pendienteCuotas)} en cuotas futuras`}
-                          </p>
+                          {t.pagadoMes > 0 && <p className="meta-detail positive">Pagado este mes: {formatQ(t.pagadoMes)}</p>}
                         </div>
                       </div>
                       <div className="row-actions">
@@ -1785,17 +1831,6 @@ function ControlGastos({ user }) {
                       </div>
                     </li>
                   ))}
-                  {cuotasSinTarjeta > 0 && (
-                    <li className="ledger-row">
-                      <div className="row-main">
-                        <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
-                        <div className="row-desc">Cuotas sin tarjeta asociada</div>
-                      </div>
-                      <div className="row-actions">
-                        <span className="amount-mono negative">{formatQ(cuotasSinTarjeta)}</span>
-                      </div>
-                    </li>
-                  )}
                 </ul>
               )}
             </div>
@@ -1894,8 +1929,8 @@ function ControlGastos({ user }) {
               {data.tarjetas.length > 0 && (
                 <ul className="ledger-list">
                   {data.tarjetas.map((t) => {
-                    const resumen = simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], currentMonth);
-                    const totalMesActual = getTotalTarjetaMes(t, data, currentMonth);
+                    const resumen = getResumenTarjetaMes(t, data, currentMonth);
+                    const totalMesActual = resumen.montoDelMes;
                     const meses = getMesesConCargos(t, data, currentMonth);
                     const abierta = !!tarjetasAbiertas[t.id];
                     return (
@@ -1908,7 +1943,6 @@ function ControlGastos({ user }) {
                             <p className="meta-detail">
                               Pago de este mes: {formatQ(totalMesActual)}
                               {resumen.ajusteAcumulado > 0 && ` · ${formatQ(resumen.ajusteAcumulado)} a favor`}
-                              {resumen.ajusteAcumulado < 0 && ` · debes ${formatQ(-resumen.ajusteAcumulado)} adicional`}
                             </p>
                             {pagoTarjetaFormId === t.id ? (
                               <div className="abono-form">
@@ -2392,6 +2426,7 @@ const STYLES = `
 .meta-badge { background:rgba(48,209,88,0.16); color:var(--positive); }
 .tarjeta-badge { background:rgba(100,210,255,0.16); color:#64D2FF; }
 .meta-detail { font-size:11.5px; color:var(--text-secondary); margin:6px 0 0; }
+.meta-detail.positive { color:var(--positive); }
 .row-desc { font-size:14px; color:var(--text); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .cat-name { font-size:11.5px; color:var(--text-secondary); }
 .pill { font-size:10.5px; background:rgba(255,255,255,0.08); color:var(--text-secondary); padding:2px 8px; border-radius:20px; font-weight:600; }

@@ -309,11 +309,12 @@ function simularTarjeta(tarjeta, gastosTC, pagosTarjeta, hastaMes) {
 
 }
 function getTotalGastosMes(data, monthK) {
-  const unicos = data.gastos.filter((g) => g.mes === monthK).reduce((a, g) => a + g.monto, 0);
-  const cuotas = getCuotasActivas(data.cuotas, monthK).reduce((a, c) => a + c.montoCuota, 0);
-  const fijos = data.gastosFijos.filter((f) => gastoFijoActivoEnMes(f, monthK)).reduce((a, f) => a + f.monto, 0);
-  const tc = data.tarjetas.reduce((a, t) => a + simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], monthK).montoDelMes, 0);
-  return unicos + cuotas + fijos + tc;
+  // Flujo de caja real: efectivo/débito sale de inmediato; lo pagado con tarjeta
+  // no resta hasta que se registra el pago a esa tarjeta (dinero que realmente sale del bolsillo).
+  const unicos = data.gastos.filter((g) => g.mes === monthK && g.metodoPago !== 'tarjeta').reduce((a, g) => a + g.monto, 0);
+  const fijos = data.gastosFijos.filter((f) => gastoFijoActivoEnMes(f, monthK) && f.metodoPago !== 'tarjeta').reduce((a, f) => a + f.monto, 0);
+  const pagosTarjetaDelMes = (data.pagosTarjeta || []).filter((p) => (p.fecha ? p.fecha.slice(0, 7) : p.mes) === monthK).reduce((a, p) => a + p.monto, 0);
+  return unicos + fijos + pagosTarjetaDelMes;
 }
 function monthsBetween(fromKey, toKey) {
   const [y1, m1] = fromKey.split('-').map(Number);
@@ -663,6 +664,8 @@ function ControlGastos({ user }) {
   const [editandoGastoTCId, setEditandoGastoTCId] = useState(null);
   const [editGastoTCMonto, setEditGastoTCMonto] = useState('');
   const [editandoGastoFijoId, setEditandoGastoFijoId] = useState(null);
+  const [editandoNombreGastoId, setEditandoNombreGastoId] = useState(null);
+  const [editNombreGastoDraft, setEditNombreGastoDraft] = useState('');
   const [editGastoFijoMonto, setEditGastoFijoMonto] = useState('');
   const [pagoTarjetaFormId, setPagoTarjetaFormId] = useState(null);
   const [pagoTarjetaDraft, setPagoTarjetaDraft] = useState('');
@@ -747,8 +750,8 @@ function ControlGastos({ user }) {
       return Array.from({ length: n }, (_, i) => (prev[i] !== undefined ? prev[i] : base));
     });
   }, [personalizarCuotas, numCuotas]);
-  useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); setAjusteSaldoFormId(null); }, [currentMonth]);
-  useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); setEditandoTarjetaId(null); setAjusteSaldoFormId(null); }, [view]);
+  useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); setAjusteSaldoFormId(null); setEditandoNombreGastoId(null); }, [currentMonth]);
+  useEffect(() => { setConfirmingId(null); setAbonoFormId(null); setAporteFormId(null); setPagoTarjetaFormId(null); setEditandoTarjetaId(null); setAjusteSaldoFormId(null); setEditandoNombreGastoId(null); }, [view]);
 
   const gastosUnicosMes = useMemo(() => data.gastos.filter((g) => g.mes === currentMonth).sort((a, b) => (a.dia || 999) - (b.dia || 999)), [data.gastos, currentMonth]);
   const cuotasActivasMes = useMemo(() => getCuotasActivas(data.cuotas, currentMonth), [data.cuotas, currentMonth]);
@@ -756,19 +759,38 @@ function ControlGastos({ user }) {
   const gastosTCActivosMes = useMemo(() => getGastosTCActivos(data.gastosTC, data.tarjetas, currentMonth), [data.gastosTC, data.tarjetas, currentMonth]);
   const resumenTarjetasMes = useMemo(() => {
     return data.tarjetas
-      .map((t) => ({ ...t, ...simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], currentMonth) }))
-      .filter((t) => t.montoDelMes > 0 || t.ajusteAcumulado !== 0)
+      .map((t) => {
+        const montoTC = gastosTCActivosMes.filter((g) => g.tarjetaId === t.id).reduce((a, g) => a + g.monto, 0);
+        return { ...t, montoDelMes: montoTC };
+      })
+      .filter((t) => t.montoDelMes > 0)
       .sort((a, b) => (a.diaPago || 999) - (b.diaPago || 999));
-  }, [data.tarjetas, data.gastosTC, data.pagosTarjeta, currentMonth]);
+  }, [data.tarjetas, gastosTCActivosMes]);
   const ingresoMes = useMemo(() => getIngresoMes(data.ingresos, currentMonth), [data.ingresos, currentMonth]);
   const ingresoEfectivo = ingresoMes.q1 + ingresoMes.q2 + ingresoMes.bono;
+  const pagosTarjetaMes = useMemo(
+    () => (data.pagosTarjeta || []).filter((p) => (p.fecha ? p.fecha.slice(0, 7) : p.mes) === currentMonth),
+    [data.pagosTarjeta, currentMonth]
+  );
+  const pagosTarjetaMesPorTarjeta = useMemo(() => {
+    const map = {};
+    pagosTarjetaMes.forEach((p) => {
+      if (!map[p.tarjetaId]) map[p.tarjetaId] = { tarjetaId: p.tarjetaId, total: 0 };
+      map[p.tarjetaId].total += p.monto;
+    });
+    return Object.values(map).map((r) => ({
+      ...r,
+      nombre: (data.tarjetas.find((t) => t.id === r.tarjetaId) || {}).nombre || 'Tarjeta',
+    }));
+  }, [pagosTarjetaMes, data.tarjetas]);
   const totalGastosMes = useMemo(() => {
-    const sumUnicos = gastosUnicosMes.reduce((a, g) => a + g.monto, 0);
-    const sumCuotas = cuotasActivasMes.reduce((a, c) => a + c.montoCuota, 0);
-    const sumFijos = gastosFijosActivosMes.reduce((a, f) => a + f.monto, 0);
-    const sumTC = data.tarjetas.reduce((a, t) => a + simularTarjeta(t, data.gastosTC, data.pagosTarjeta || [], currentMonth).montoDelMes, 0);
-    return sumUnicos + sumCuotas + sumFijos + sumTC;
-  }, [gastosUnicosMes, cuotasActivasMes, gastosFijosActivosMes, data.tarjetas, data.gastosTC, data.pagosTarjeta, currentMonth]);
+    // Flujo de caja real: efectivo/débito sale de inmediato; lo pagado con tarjeta
+    // no resta hasta que registrás el pago a esa tarjeta.
+    const sumUnicos = gastosUnicosMes.filter((g) => g.metodoPago !== 'tarjeta').reduce((a, g) => a + g.monto, 0);
+    const sumFijos = gastosFijosActivosMes.filter((f) => f.metodoPago !== 'tarjeta').reduce((a, f) => a + f.monto, 0);
+    const sumPagosTarjeta = pagosTarjetaMes.reduce((a, p) => a + p.monto, 0);
+    return sumUnicos + sumFijos + sumPagosTarjeta;
+  }, [gastosUnicosMes, gastosFijosActivosMes, pagosTarjetaMes]);
   const aportesMes = useMemo(() => data.metas.reduce((sum, m) => sum + ((m.aportes && m.aportes[currentMonth]) || 0), 0), [data.metas, currentMonth]);
   const saldo = ingresoEfectivo - totalGastosMes - aportesMes;
 
@@ -789,6 +811,7 @@ function ControlGastos({ user }) {
     const total = Object.values(map).reduce((a, b) => a + b, 0);
     return Object.entries(map).map(([id, sum]) => ({ id, label: catLabel(id), color: catColor(id), total: sum, pct: total > 0 ? (sum / total) * 100 : 0 })).sort((a, b) => b.total - a.total);
   }, [gastosUnicosMes, cuotasActivasMes, gastosFijosActivosMes, gastosTCActivosMes]);
+  const totalPorCategoria = useMemo(() => porCategoria.reduce((a, c) => a + c.total, 0), [porCategoria]);
 
   const tendenciaMeses = useMemo(() => {
     const meses = [];
@@ -919,6 +942,13 @@ function ControlGastos({ user }) {
     setDescFijo(''); setMontoFijo('');
   }
   function removeGasto(id) { setData((prev) => ({ ...prev, gastos: prev.gastos.filter((g) => g.id !== id) })); }
+  function guardarNombreGasto(id) {
+    const nombre = editNombreGastoDraft.trim();
+    if (!nombre) { setEditandoNombreGastoId(null); return; }
+    setData((prev) => ({ ...prev, gastos: prev.gastos.map((g) => g.id === id ? { ...g, descripcion: nombre } : g) }));
+    setEditandoNombreGastoId(null);
+    setEditNombreGastoDraft('');
+  }
   function removeCuota(id) { setData((prev) => ({ ...prev, cuotas: prev.cuotas.filter((c) => c.id !== id) })); }
   function removeGastoFijo(id) { setData((prev) => ({ ...prev, gastosFijos: prev.gastosFijos.filter((f) => f.id !== id) })); }
   function iniciarEdicionGastoFijo(f) {
@@ -1208,7 +1238,7 @@ function ControlGastos({ user }) {
           </div>
 
           <div className="balance-line">
-            <span className="label">Ingreso extra <span className="date-range">(bono / aguinaldo)</span></span>
+            <span className="label">Ingreso extra</span>
             {editingQuincena === 'bono' ? (
               <div className="ingreso-edit">
                 <input type="number" step="0.01" min="0" autoFocus className="ingreso-input" value={ingresoDraft}
@@ -1441,7 +1471,7 @@ function ControlGastos({ user }) {
 
         <div className="card">
           <h2 className="section-title">Movimientos de {monthLabel(currentMonth)}</h2>
-          {gastosUnicosMes.length === 0 && cuotasActivasMes.length === 0 && gastosFijosActivosMes.length === 0 && resumenTarjetasMes.length === 0 ? (
+          {gastosUnicosMes.length === 0 && cuotasActivasMes.length === 0 && gastosFijosActivosMes.length === 0 && resumenTarjetasMes.length === 0 && pagosTarjetaMes.length === 0 ? (
             <p className="empty-state">Aún no registras movimientos este mes. Agrega el primero arriba.</p>
           ) : (
             <ul className="ledger-list">
@@ -1456,6 +1486,7 @@ function ControlGastos({ user }) {
                         {c.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === c.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
                         {c.tieneAbono && <span className="pill pill-abono">+ abono</span>}
                         {c.moneda === 'USD' && <span className="pill pill-usd">${c.montoTotalOriginal.toFixed(2)} USD</span>}
+                        <span className="pill pill-pendiente">pendiente</span>
                         <PaymentTag metodo={c.metodoPago} />
                       </div>
                       <div className="progress-track"><div className="progress-fill" style={{ width: `${c.progresoPct}%` }} /></div>
@@ -1518,6 +1549,7 @@ function ControlGastos({ user }) {
                           {f.descripcion} <span className="pill">Fijo</span>
                           {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
                           {f.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === f.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
+                          {f.metodoPago === 'tarjeta' && <span className="pill pill-pendiente">pendiente</span>}
                           <PaymentTag metodo={f.metodoPago} />
                         </>
                       )}
@@ -1547,10 +1579,9 @@ function ControlGastos({ user }) {
                     <DayBadge dia={t.diaPago} />
                     <div>
                       <div className="row-desc">
-                        Pago tarjeta {t.nombre} <span className="pill pill-usd">TC</span>
-                        {t.montoDelMes !== t.esperadoDelMes && <span className="pill pill-abono">ajustado</span>}
+                        Compras con {t.nombre} <span className="pill pill-usd">TC</span>
                       </div>
-                      {t.ajusteAcumulado > 0 && <p className="meta-detail">Te queda {formatQ(t.ajusteAcumulado)} a favor para el próximo mes</p>}
+                      <p className="meta-detail">Cargos de este ciclo pendientes de vencer</p>
                     </div>
                   </div>
                   <div className="row-actions">
@@ -1563,15 +1594,33 @@ function ControlGastos({ user }) {
                   <div className="row-main">
                     <CategoryBadge id={g.categoria} />
                     <DayBadge dia={g.dia} />
-                    <div className="row-desc">
-                      {g.descripcion} <span className="cat-name">{catLabel(g.categoria)}</span>
-                      {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
-                      {g.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === g.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
-                      <PaymentTag metodo={g.metodoPago} />
-                    </div>
+                    {editandoNombreGastoId === g.id ? (
+                      <div className="abono-form">
+                        <input
+                          type="text" autoFocus className="abono-input" style={{ width: 160 }}
+                          value={editNombreGastoDraft}
+                          onChange={(e) => setEditNombreGastoDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') guardarNombreGasto(g.id); if (e.key === 'Escape') setEditandoNombreGastoId(null); }}
+                        />
+                        <button className="icon-btn small" onClick={() => guardarNombreGasto(g.id)} aria-label="Guardar nombre"><Icon name="check" size={16} /></button>
+                        <button className="icon-btn small" onClick={() => setEditandoNombreGastoId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                      </div>
+                    ) : (
+                      <div className="row-desc">
+                        {g.descripcion} <span className="cat-name">{catLabel(g.categoria)}</span>
+                        {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
+                        {g.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === g.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
+                        {g.metodoPago === 'tarjeta' && <span className="pill pill-pendiente">pendiente</span>}
+                        <PaymentTag metodo={g.metodoPago} />
+                      </div>
+                    )}
                   </div>
+                  {editandoNombreGastoId !== g.id && (
                   <div className="row-actions">
                     <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                    {g.metodoPago !== 'tarjeta' && (
+                      <button className="icon-btn small" onClick={() => { setEditNombreGastoDraft(g.descripcion); setEditandoNombreGastoId(g.id); }} aria-label="Editar nombre"><Icon name="pencil" size={13} /></button>
+                    )}
                     {confirmingId === g.id ? (
                       <span className="confirm-group">
                         <span className="confirm-warning">¿Eliminar? No se puede deshacer.</span>
@@ -1582,6 +1631,20 @@ function ControlGastos({ user }) {
                       <button className="icon-btn small danger" onClick={() => setConfirmingId(g.id)} aria-label="Eliminar gasto"><Icon name="trash" size={14} /></button>
                     )}
                   </div>
+                  )}
+                </li>
+              ))}
+              {pagosTarjetaMesPorTarjeta.map((r) => (
+                <li key={`pago-${r.tarjetaId}`} className="ledger-row">
+                  <div className="row-main">
+                    <span className="cat-badge pago-badge"><Icon name="banknote" size={16} /></span>
+                    <div className="row-desc">
+                      Pago a {r.nombre} <span className="pill pill-abono">pago</span>
+                    </div>
+                  </div>
+                  <div className="row-actions">
+                    <span className="amount-mono negative">-{formatQ(r.total)}</span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1591,7 +1654,6 @@ function ControlGastos({ user }) {
         {compromisosFuturos.length > 0 && (
           <div className="card">
             <h2 className="section-title">Compromisos futuros</h2>
-            <p className="section-sub">Cuotas activas que seguirás pagando en los próximos meses.</p>
             <ul className="ledger-list">
               {compromisosFuturos.map((c) => (
                 <li key={c.id} className="ledger-row">
@@ -1650,7 +1712,7 @@ function ControlGastos({ user }) {
             <div className="donut-wrap">
               <DonutChart data={porCategoria} size={200} strokeWidth={22} />
               <div className="donut-center">
-                <span className="donut-total">{formatQ(totalGastosMes)}</span>
+                <span className="donut-total">{formatQ(totalPorCategoria)}</span>
                 <span className="donut-caption">este mes</span>
               </div>
             </div>
@@ -2096,14 +2158,39 @@ function ControlGastos({ user }) {
                                               <div className="row-main">
                                                 <CategoryBadge id={g.categoria} />
                                                 <DayBadge dia={g.dia} />
-                                                <div className="row-desc">
-                                                  {g.descripcion}
-                                                  {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
-                                                </div>
+                                                {editandoNombreGastoId === g.id ? (
+                                                  <div className="abono-form">
+                                                    <input
+                                                      type="text" autoFocus className="abono-input" style={{ width: 160 }}
+                                                      value={editNombreGastoDraft}
+                                                      onChange={(e2) => setEditNombreGastoDraft(e2.target.value)}
+                                                      onKeyDown={(e2) => { if (e2.key === 'Enter') guardarNombreGasto(g.id); if (e2.key === 'Escape') setEditandoNombreGastoId(null); }}
+                                                    />
+                                                    <button className="icon-btn small" onClick={() => guardarNombreGasto(g.id)} aria-label="Guardar nombre"><Icon name="check" size={16} /></button>
+                                                    <button className="icon-btn small" onClick={() => setEditandoNombreGastoId(null)} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                                                  </div>
+                                                ) : (
+                                                  <div className="row-desc">
+                                                    {g.descripcion}
+                                                    {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
+                                                  </div>
+                                                )}
                                               </div>
+                                              {editandoNombreGastoId !== g.id && (
                                               <div className="row-actions">
                                                 <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                                <button className="icon-btn small" onClick={() => { setEditNombreGastoDraft(g.descripcion); setEditandoNombreGastoId(g.id); }} aria-label="Editar nombre"><Icon name="pencil" size={13} /></button>
+                                                {confirmingId === `unico-tarjeta__${g.id}` ? (
+                                                  <span className="confirm-group">
+                                                    <span className="confirm-warning">¿Eliminar? No se puede deshacer.</span>
+                                                    <button className="btn-add danger small" onClick={() => { removeGasto(g.id); setConfirmingId(null); }}>Sí, eliminar</button>
+                                                    <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                                                  </span>
+                                                ) : (
+                                                  <button className="icon-btn small danger" onClick={() => setConfirmingId(`unico-tarjeta__${g.id}`)} aria-label="Eliminar gasto"><Icon name="trash" size={14} /></button>
+                                                )}
                                               </div>
+                                              )}
                                             </li>
                                           );
                                         }
@@ -2483,6 +2570,7 @@ const STYLES = `
 .cat-badge { border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .meta-badge { background:rgba(48,209,88,0.16); color:var(--positive); }
 .tarjeta-badge { background:rgba(100,210,255,0.16); color:#64D2FF; }
+.pago-badge { background:rgba(48,209,88,0.16); color:var(--positive); }
 .meta-detail { font-size:11.5px; color:var(--text-secondary); margin:6px 0 0; }
 .meta-detail.positive { color:var(--positive); }
 .row-desc { font-size:14px; color:var(--text); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -2491,6 +2579,7 @@ const STYLES = `
 .pill-cuota { background:var(--accent-soft); color:var(--accent); }
 .pill-abono { background:rgba(48,209,88,0.16); color:var(--positive); }
 .pill-usd { background:rgba(100,210,255,0.14); color:#64D2FF; }
+.pill-pendiente { background:rgba(224,178,92,0.16); color:#E0B25C; }
 .progress-track { width:130px; height:5px; background:rgba(255,255,255,0.08); border-radius:4px; margin-top:6px; overflow:hidden; }
 .progress-fill { height:100%; background:var(--accent); border-radius:4px; transition: width 0.3s ease; }
 .row-actions { display:flex; align-items:center; gap:10px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }

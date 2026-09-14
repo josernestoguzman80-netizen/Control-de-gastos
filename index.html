@@ -1486,7 +1486,6 @@ function ControlGastos({ user }) {
                         {c.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === c.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
                         {c.tieneAbono && <span className="pill pill-abono">+ abono</span>}
                         {c.moneda === 'USD' && <span className="pill pill-usd">${c.montoTotalOriginal.toFixed(2)} USD</span>}
-                        <span className="pill pill-pendiente">pendiente</span>
                         <PaymentTag metodo={c.metodoPago} />
                       </div>
                       <div className="progress-track"><div className="progress-fill" style={{ width: `${c.progresoPct}%` }} /></div>
@@ -1549,7 +1548,6 @@ function ControlGastos({ user }) {
                           {f.descripcion} <span className="pill">Fijo</span>
                           {f.moneda === 'USD' && <span className="pill pill-usd">${f.montoOriginal.toFixed(2)} USD</span>}
                           {f.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === f.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
-                          {f.metodoPago === 'tarjeta' && <span className="pill pill-pendiente">pendiente</span>}
                           <PaymentTag metodo={f.metodoPago} />
                         </>
                       )}
@@ -1610,7 +1608,6 @@ function ControlGastos({ user }) {
                         {g.descripcion} <span className="cat-name">{catLabel(g.categoria)}</span>
                         {g.moneda === 'USD' && <span className="pill pill-usd">${g.montoOriginal.toFixed(2)} USD</span>}
                         {g.tarjetaId && <span className="pill pill-usd">{(data.tarjetas.find((t) => t.id === g.tarjetaId) || {}).nombre || 'Tarjeta'}</span>}
-                        {g.metodoPago === 'tarjeta' && <span className="pill pill-pendiente">pendiente</span>}
                         <PaymentTag metodo={g.metodoPago} />
                       </div>
                     )}
@@ -2579,7 +2576,6 @@ const STYLES = `
 .pill-cuota { background:var(--accent-soft); color:var(--accent); }
 .pill-abono { background:rgba(48,209,88,0.16); color:var(--positive); }
 .pill-usd { background:rgba(100,210,255,0.14); color:#64D2FF; }
-.pill-pendiente { background:rgba(224,178,92,0.16); color:#E0B25C; }
 .progress-track { width:130px; height:5px; background:rgba(255,255,255,0.08); border-radius:4px; margin-top:6px; overflow:hidden; }
 .progress-fill { height:100%; background:var(--accent); border-radius:4px; transition: width 0.3s ease; }
 .row-actions { display:flex; align-items:center; gap:10px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }

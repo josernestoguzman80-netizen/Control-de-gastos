@@ -158,6 +158,49 @@ const METODOS_PAGO = [
   { id: 'debito', label: 'Débito', icon: 'wallet' },
   { id: 'tarjeta', label: 'Tarjeta', icon: 'creditCard' },
 ];
+const CONSULTAS = [
+  { pregunta: 'La app dice que tengo saldo a favor, pero no es cierto',
+    respuesta: [
+      'Pasa cuando registras un pago que incluía compras que no anotaste en la app. La app solo conoce las compras registradas, así que ve el pago más grande y lo toma como saldo a favor.',
+      'Para corregirlo ve a Tarjetas → Historial de pagos, toca "Compras no registradas" en ese pago e indica cuánto fue. Esa parte deja de descontarse de tu deuda. Para quitarlo, deja el monto vacío o en 0.',
+      'Al registrar un pago nuevo también puedes marcar "Una parte es de compras que no registré" y escribir la cantidad.',
+    ] },
+  { pregunta: '¿Qué pasa si pago más o menos de lo que debo en la tarjeta?',
+    respuesta: [
+      'El pago cubre tus compras de la más antigua a la más reciente. Las que alcanza a cubrir quedan "Pagada" y la que queda a medias muestra cuánto se pagó.',
+      'Si pagas menos, lo que falta pasa al siguiente mes como "Pendiente de meses anteriores". Si pagas más, la diferencia queda como saldo a favor y se resta del siguiente estado de cuenta.',
+    ] },
+  { pregunta: '¿Para qué sirve "Ajustar saldo"?',
+    respuesta: [
+      'Para que la app cuadre con tu estado de cuenta, por ejemplo cuando el banco cobra intereses o comisiones que la app no calcula.',
+      'Escribe lo que todavía debes según el banco. La app guarda la diferencia como un cargo (o descuento) en ese mes y los meses siguientes se siguen sumando normal.',
+      'Se aplica al mes que tienes seleccionado arriba, así que ubícate en el mes del estado de cuenta antes de ajustar.',
+    ] },
+  { pregunta: '¿Por qué una compra con tarjeta aparece en otro mes?',
+    respuesta: [
+      'Las compras con tarjeta se agrupan por el mes en que se pagan, no por el mes en que compraste. Una compra hecha después del día de corte entra en el siguiente corte y se paga en la fecha de pago de ese ciclo.',
+      'Esto aplica también a gastos únicos, gastos fijos y cuotas que marques con tarjeta.',
+    ] },
+  { pregunta: '¿Por qué mi saldo en Inicio no baja cuando compro con tarjeta?',
+    respuesta: [
+      'Inicio mide el dinero que realmente sale de tu bolsillo. Con tarjeta, el dinero sale cuando pagas la tarjeta, así que se resta cuando registras ese pago. Así no se cuenta dos veces.',
+      'Lo que debes en tarjetas lo ves en la pestaña Tarjetas o preguntándole al asistente.',
+    ] },
+  { pregunta: '¿Por qué cambia el monto de un gasto en dólares?',
+    respuesta: [
+      'Los gastos fijos en dólares (como suscripciones) se recalculan cada vez que cambias el tipo de cambio, porque cada mes se cobran a la tasa del día.',
+      'Las compras únicas, compras con tarjeta y cuotas en dólares conservan la tasa con la que las registraste.',
+    ] },
+  { pregunta: '¿La app calcula intereses de la tarjeta?',
+    respuesta: [
+      'No. Si pagas menos del total, el banco puede cobrarte intereses que la app no suma. Usa "Ajustar saldo" con el monto de tu estado de cuenta para que cuadre.',
+    ] },
+  { pregunta: '¿Qué le puedo preguntar o pedir al asistente?',
+    respuesta: [
+      'Preguntas como "¿cuánto debo en noviembre y diciembre?", "¿cuánto pago de Claude?", "¿cuánto gasté en comida?" o "¿qué pasa si pago 1000?". Puedes seguir con "¿y para enero?".',
+      'También puede registrar por ti: "gasté 80 en almuerzo en efectivo", "pagué 500 a BAC" o "registra un gasto fijo de Netflix $15.99 el día 5". Siempre te muestra los datos para revisarlos y solo guarda cuando tocas Confirmar.',
+    ] },
+];
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 /* ============================== FUNCIONES ============================== */
@@ -998,7 +1041,7 @@ function responderAsistente(intencion, data, textoOriginal) {
       monto: f.pendiente,
       tono: f.pendiente <= 0 ? 'positive' : f.dias <= 3 ? 'negative' : 'warning',
       nota: f.pendiente <= 0
-        ? (f.aFavor > 0.005 ? `Estás al día y tienes ${formatQ(f.aFavor)} a favor. Si no es real, en Tarjetas → Historial de pagos indica qué parte de tus pagos fue de compras que no registraste.` : f.pagado > 0 ? `Ya pagaste ${formatQ(f.pagado)}. Estás al día` : 'No tienes nada pendiente para esa fecha')
+        ? (f.aFavor > 0.005 ? `Estás al día y tienes ${formatQ(f.aFavor)} a favor` : f.pagado > 0 ? `Ya pagaste ${formatQ(f.pagado)}. Estás al día` : 'No tienes nada pendiente para esa fecha')
         : (f.pagado > 0 ? `Ya abonaste ${formatQ(f.pagado)}; esto es lo que falta.` : null),
       alerta: f.saltado ? `El pago del ${formatFechaCorta(f.saltado.fechaPago)} ya está cubierto ✓, por eso te muestro el siguiente.` : null,
       detalle: f.pendiente > 0 ? f.detalle : [],
@@ -3075,7 +3118,6 @@ function ControlGastos({ user, onIrALogin }) {
                                 {t.pagadoMes > 0 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.pagadoMes)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
-                              {t.estado.aFavor > 0.005 && <p className="meta-detail hint-favor">¿No es real? En "Historial de pagos" indica qué parte de tus pagos fue de compras que no registraste.</p>}
                               {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">✓ Estado de cuenta pagado</p>}
                               <button className="abono-link" onClick={() => { setAjusteSaldoDraft(String(t.total)); setAjusteSaldoFormId(t.id); }}>
                                 Ajustar saldo
@@ -3205,9 +3247,6 @@ function ControlGastos({ user, onIrALogin }) {
                                 : `Nada pendiente para el ${formatFechaCorta(resumen.estado.fechaPago)} ✓`}
                               {resumen.ajusteAcumulado > 0.005 && ` · ${formatQ(resumen.ajusteAcumulado)} a favor`}
                             </p>
-                            {resumen.ajusteAcumulado > 0.005 && (
-                              <p className="meta-detail hint-favor">¿No es real? Si pagaste compras que no anotaste en la app, en "Historial de pagos" toca "Compras no registradas" en ese pago e indica cuánto fue.</p>
-                            )}
                             {pagoTarjetaFormId === t.id ? (
                               <div className="abono-form">
                                 <input
@@ -3551,6 +3590,18 @@ function ControlGastos({ user, onIrALogin }) {
             </div>
           )}
           <div className="card">
+            <h2 className="section-title">Consultas</h2>
+            <p className="section-sub">Respuestas rápidas sobre cómo calcula la app.</p>
+            <div className="faq-list">
+              {CONSULTAS.map((c, i) => (
+                <details key={i} className="faq-item">
+                  <summary>{c.pregunta}<Icon name="chevronDown" size={15} /></summary>
+                  <div className="faq-body">{c.respuesta.map((r, j) => <p key={j}>{r}</p>)}</div>
+                </details>
+              ))}
+            </div>
+          </div>
+          <div className="card">
             <h2 className="section-title">Configuración</h2>
             <p className="section-sub">Ajustes generales de la app.</p>
             <div className="settings-row">
@@ -3832,6 +3883,15 @@ const STYLES = `
 .legend-pct { font-size:11.5px; color:var(--text-secondary); min-width:32px; text-align:right; }
 
 .footer-row { text-align:center; margin-top:24px; }
+.faq-list { display:flex; flex-direction:column; }
+.faq-item { border-top:1px solid var(--border); }
+.faq-item:first-child { border-top:none; }
+.faq-item summary { list-style:none; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 0; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text); }
+.faq-item summary::-webkit-details-marker { display:none; }
+.faq-item summary svg { color:var(--text-secondary); flex-shrink:0; transition:transform 0.15s ease; }
+.faq-item[open] summary svg { transform:rotate(180deg); }
+.faq-body { padding:0 0 12px; }
+.faq-body p { font-size:12.5px; color:var(--text-secondary); line-height:1.55; margin:0 0 8px; }
 .settings-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-top:1px solid var(--border); }
 .settings-row-title { font-size:14px; color:var(--text); font-weight:600; }
 

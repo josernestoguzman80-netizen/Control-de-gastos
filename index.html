@@ -182,7 +182,7 @@ const CONSULTAS = [
       'Para que la app cuadre con tu estado de cuenta, por ejemplo cuando el banco cobra intereses o comisiones que la app no calcula.',
       'Escribe lo que todavía debes según el banco. La app guarda la diferencia como un cargo (o descuento) en ese mes y los meses siguientes se siguen sumando normal.',
       'Se aplica al mes que tienes seleccionado arriba, así que ubícate en el mes del estado de cuenta antes de ajustar.',
-      'Los ajustes aparecen como "Ajuste de saldo" en Deuda total y en el historial por mes de la tarjeta. Si uno ya no aplica (por ejemplo, te deja un saldo a favor que no es real), tócale "Quitar" o el ícono de basurero.',
+      'Los ajustes se ven solo en Ajustes → Ajustes de saldo. Si uno ya no aplica (por ejemplo, te deja un saldo a favor que no es real), quítalo con el ícono de basurero.',
     ] },
   { pregunta: '¿Por qué una compra con tarjeta aparece en otro mes?',
     respuesta: [
@@ -522,9 +522,15 @@ function getEstadoTarjeta(tarjeta, data, mes) {
   const limite = isoPago > hoy ? isoPago : hoy;
   const pagadoCiclo = pagos.filter((p) => p.fechaISO > isoPagoAnt && p.fechaISO <= limite).reduce((a, p) => a + p.monto, 0);
   const neto = saldoAnterior + totalCiclo - pagadoCiclo;
+  // Para mostrar: los pagos de este periodo primero cubren lo que venía pendiente de meses anteriores.
+  const deudaAnterior = Math.max(saldoAnterior, 0);
+  const pendienteAnterior = Math.max(deudaAnterior - pagadoCiclo, 0);     // lo de antes que AÚN no pagas
+  const favorAnterior = Math.max(-saldoAnterior, 0);                      // saldo a favor que ya traías
+  const pagosDelCiclo = Math.max(pagadoCiclo - deudaAnterior, 0);          // pagos que quedan para este estado
   return {
     fechaPago, fechaCorte: fechaCorteDeMes(tarjeta, mes),
     saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo, inicialCiclo,
+    pendienteAnterior, favorAnterior, pagosDelCiclo,
     pendiente: Math.max(neto, 0),
     aFavor: Math.max(-neto, 0),
     cargosCiclo,
@@ -537,6 +543,7 @@ function getMesesConCargos(tarjeta, data, hastaMes) {
 function getEntradasTarjetaMes(tarjeta, data, mes) {
   const asignado = getAsignacionPagos(tarjeta, data, mes);
   return getEstadoTarjeta(tarjeta, data, mes).cargosCiclo
+    .filter((c) => c.tipo !== 'ajuste') // los ajustes de saldo solo se ven en Ajustes
     .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.monto, pagado: asignado[c.key] || 0,
                    ciclo: { fechaCorte: c.fechaCorte, fechaPago: c.fechaPago, mesPago: c.mesPago } }))
     .sort((a, b) => a.dia - b.dia);
@@ -978,7 +985,7 @@ function responderAsistente(intencion, data, textoOriginal) {
         subtitulo: null,
         monto: despues.pendiente,
         tono: despues.pendiente > 0.005 ? 'warning' : 'positive',
-        nota: est.saldoAnterior > 0.005 ? `El pago primero cubre ${formatQ(est.saldoAnterior)} pendientes de meses anteriores.` : null,
+        nota: est.pendienteAnterior > 0.005 ? `El pago primero cubre ${formatQ(est.pendienteAnterior)} pendientes de meses anteriores.` : null,
         alerta: null,
         detalle,
       }] : null,
@@ -1003,8 +1010,8 @@ function responderAsistente(intencion, data, textoOriginal) {
             label: nombreEntrada(e) + (e.pagado >= e.monto - 0.005 && e.monto > 0 ? ' ✓' : ''),
             valor: formatQ(e.monto),
           }));
-          if (idx === 0 && est.saldoAnterior > 0.005) detalle.unshift({ label: 'Pendiente de meses anteriores', valor: formatQ(est.saldoAnterior) });
-          if (idx === 0 && est.pagadoCiclo > 0) detalle.push({ label: 'Pagos registrados', valor: '-' + formatQ(est.pagadoCiclo) });
+          if (idx === 0 && est.pendienteAnterior > 0.005) detalle.unshift({ label: 'Pendiente de meses anteriores', valor: formatQ(est.pendienteAnterior) });
+          if (idx === 0 && est.pagosDelCiclo > 0.005) detalle.push({ label: 'Pagos registrados', valor: '-' + formatQ(est.pagosDelCiclo) });
           bloques.push({
             titulo: `${t.nombre} · ${monthLabel(mes)}`,
             subtitulo: `Pago el ${formatFechaCorta(est.fechaPago)}`,
@@ -1053,9 +1060,9 @@ function responderAsistente(intencion, data, textoOriginal) {
         label: nombreEntrada(e) + (e.pagado >= e.monto - 0.005 && e.monto > 0 ? ' ✓' : ''),
         valor: formatQ(e.monto),
       }));
-      if (est.saldoAnterior > 0.005) detalle.unshift({ label: 'Pendiente de meses anteriores', valor: formatQ(est.saldoAnterior) });
-      if (est.saldoAnterior < -0.005) detalle.unshift({ label: 'Saldo a favor anterior', valor: '-' + formatQ(-est.saldoAnterior) });
-      if (pagado > 0) detalle.push({ label: 'Pagos registrados', valor: '-' + formatQ(pagado) });
+      if (est.pendienteAnterior > 0.005) detalle.unshift({ label: 'Pendiente de meses anteriores', valor: formatQ(est.pendienteAnterior) });
+      if (est.favorAnterior > 0.005) detalle.unshift({ label: 'Saldo a favor anterior', valor: '-' + formatQ(est.favorAnterior) });
+      if (est.pagosDelCiclo > 0.005) detalle.push({ label: 'Pagos registrados', valor: '-' + formatQ(est.pagosDelCiclo) });
       // Si se saltó un estado ya pagado, avisarlo.
       const mesProx = mesDeFecha(proximaFechaDia(t.diaPago));
       const saltado = !mesPedido && mes !== mesProx ? getEstadoTarjeta(t, data, mesProx) : null;
@@ -2027,8 +2034,9 @@ function ControlGastos({ user, onIrALogin }) {
   }, [data.gastosFijos]);
 
   const historialPagosTarjeta = useMemo(
-    () => getHistorialPagosTarjeta(data.tarjetas, data.pagosTarjeta || []),
-    [data.tarjetas, data.pagosTarjeta]
+    // Solo los pagos hechos en el mes que estás viendo.
+    () => getHistorialPagosTarjeta(data.tarjetas, data.pagosTarjeta || []).filter((p) => p.fecha.slice(0, 7) === currentMonth),
+    [data.tarjetas, data.pagosTarjeta, currentMonth]
   );
 
   const deudaPorTarjeta = useMemo(() => {
@@ -3121,7 +3129,7 @@ function ControlGastos({ user, onIrALogin }) {
                   <span className="amount-mono big negative">{formatQ(deudaTotal)}</span>
                 </div>
                 {pagadoEsteMesTotal > 0 && (
-                  <p className="balance-note">Ya pagaste {formatQ(pagadoEsteMesTotal)} de este estado de cuenta.</p>
+                  <p className="balance-note">Pagos registrados en este periodo: {formatQ(pagadoEsteMesTotal)}.</p>
                 )}
               </div>
               {deudaPorTarjeta.length > 0 && (
@@ -3160,17 +3168,11 @@ function ControlGastos({ user, onIrALogin }) {
                               <div className="row-desc">{t.nombre}</div>
                               <p className="meta-detail">Vence el {formatFechaCorta(t.estado.fechaPago)}</p>
                               <ul className="desglose-tc">
-                                {t.estado.saldoAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.saldoAnterior)}</span></li>}
-                                {t.estado.saldoAnterior < -0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(-t.estado.saldoAnterior)}</span></li>}
+                                {t.estado.pendienteAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.pendienteAnterior)}</span></li>}
+                                {t.estado.favorAnterior > 0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(t.estado.favorAnterior)}</span></li>}
                                 {t.estado.inicialCiclo > 0.005 && <li><span>Saldo que ya debías</span><span>{formatQ(t.estado.inicialCiclo)}</span></li>}
-                                <li><span>Cargos de este estado</span><span>{formatQ(t.estado.comprasCiclo)}</span></li>
-                                {Math.abs(t.estado.ajustesCiclo) > 0.005 && (
-                                  <li>
-                                    <span>Ajuste de saldo <button className="link-mini" onClick={() => quitarAjustesTarjeta(t.id, currentMonth)}>Quitar</button></span>
-                                    <span className={t.estado.ajustesCiclo < 0 ? 'positive' : ''}>{t.estado.ajustesCiclo < 0 ? '-' : ''}{formatQ(Math.abs(t.estado.ajustesCiclo))}</span>
-                                  </li>
-                                )}
-                                {t.pagadoMes > 0 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.pagadoMes)}</span></li>}
+                                <li><span>Cargos de este estado</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>
+                                {t.estado.pagosDelCiclo > 0.005 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.estado.pagosDelCiclo)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
                               {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">✓ Estado de cuenta pagado</p>}
@@ -3582,7 +3584,7 @@ function ControlGastos({ user, onIrALogin }) {
 
               {historialPagosTarjeta.length > 0 && (
                 <>
-                  <h2 className="section-title" style={{ marginTop: 18 }}>Historial de pagos</h2>
+                  <h2 className="section-title" style={{ marginTop: 18 }}>Pagos de {monthLabel(currentMonth)}</h2>
                   <ul className="ledger-list">
                     {historialPagosTarjeta.map((p) => (
                       <li key={p.id} className="ledger-row">
@@ -3732,6 +3734,40 @@ function ControlGastos({ user, onIrALogin }) {
                     )}
                   </li>
                 ))}
+              </ul>
+            </div>
+          )}
+          {(data.ajustesTarjeta || []).length > 0 && (
+            <div className="card">
+              <h2 className="section-title">Ajustes de saldo</h2>
+              <p className="section-sub">Correcciones hechas con "Ajustar saldo" para que la deuda cuadre con tu banco. Ya están incluidas en los cargos de cada mes.</p>
+              <ul className="ledger-list">
+                {[...(data.ajustesTarjeta || [])].sort((a, b) => (a.mes < b.mes ? 1 : -1)).map((a) => {
+                  const t = data.tarjetas.find((x) => x.id === a.tarjetaId);
+                  return (
+                    <li key={a.id} className="ledger-row">
+                      <div className="row-main">
+                        <span className="cat-badge tarjeta-badge"><Icon name="pencil" size={14} /></span>
+                        <div>
+                          <div className="row-desc">{t ? t.nombre : 'Tarjeta eliminada'}</div>
+                          <p className="meta-detail">Estado de cuenta de {monthLabel(a.mes)}</p>
+                        </div>
+                      </div>
+                      <div className="row-actions">
+                        <span className={`amount-mono ${a.monto < 0 ? 'positive' : 'negative'}`}>{a.monto < 0 ? '-' : '+'}{formatQ(Math.abs(a.monto))}</span>
+                        {confirmingId === `ajuste__${a.id}` ? (
+                          <span className="confirm-group">
+                            <span className="confirm-warning">¿Quitar ajuste?</span>
+                            <button className="btn-add danger small" onClick={() => { quitarAjuste(a.id); setConfirmingId(null); }}>Sí, quitar</button>
+                            <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                          </span>
+                        ) : (
+                          <button className="icon-btn small danger" onClick={() => setConfirmingId(`ajuste__${a.id}`)} aria-label="Quitar ajuste"><Icon name="trash" size={14} /></button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

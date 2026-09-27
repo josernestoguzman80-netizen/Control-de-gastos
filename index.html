@@ -415,9 +415,15 @@ function getCargosTarjeta(tarjeta, data, hastaMes) {
   });
   return cargos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
 }
+function montoNoRegistrado(p) {
+  if (p.externo) return p.monto; // versión anterior: todo el pago
+  return Math.min(Math.max(p.montoExterno || 0, 0), p.monto);
+}
 function getPagosDeTarjeta(tarjeta, data) {
+  // La parte de un pago que fue para compras no registradas en la app no descuenta la deuda que la app conoce.
   return (data.pagosTarjeta || []).filter((p) => p.tarjetaId === tarjeta.id)
-    .map((p) => ({ ...p, fechaISO: p.fecha || isoDeMes(p.mes, tarjeta.diaPago) }));
+    .map((p) => ({ ...p, monto: p.monto - montoNoRegistrado(p), fechaISO: p.fecha || isoDeMes(p.mes, tarjeta.diaPago) }))
+    .filter((p) => p.monto > 0.005);
 }
 // Reparte TODOS los pagos registrados entre los cargos, del más antiguo al más reciente.
 function getAsignacionPagos(tarjeta, data, hastaMes) {
@@ -992,7 +998,7 @@ function responderAsistente(intencion, data, textoOriginal) {
       monto: f.pendiente,
       tono: f.pendiente <= 0 ? 'positive' : f.dias <= 3 ? 'negative' : 'warning',
       nota: f.pendiente <= 0
-        ? (f.aFavor > 0.005 ? `Estás al día y tienes ${formatQ(f.aFavor)} a favor` : f.pagado > 0 ? `Ya pagaste ${formatQ(f.pagado)}. Estás al día` : 'No tienes nada pendiente para esa fecha')
+        ? (f.aFavor > 0.005 ? `Estás al día y tienes ${formatQ(f.aFavor)} a favor. Si no es real, en Tarjetas → Historial de pagos indica qué parte de tus pagos fue de compras que no registraste.` : f.pagado > 0 ? `Ya pagaste ${formatQ(f.pagado)}. Estás al día` : 'No tienes nada pendiente para esa fecha')
         : (f.pagado > 0 ? `Ya abonaste ${formatQ(f.pagado)}; esto es lo que falta.` : null),
       alerta: f.saltado ? `El pago del ${formatFechaCorta(f.saltado.fechaPago)} ya está cubierto ✓, por eso te muestro el siguiente.` : null,
       detalle: f.pendiente > 0 ? f.detalle : [],
@@ -1347,11 +1353,22 @@ function AccionCard({ accion, data, onConfirmar }) {
           const c = calcularCicloTC(d.fecha, t.diaCorte, t.diaPago);
           return <p className="hint">Corte {formatFechaCorta(c.fechaCorte)} · se paga el {formatFechaCorta(c.fechaPago)}</p>;
         })()}
+        {d.tipo === 'pago' && (
+          <label className="check-externo" style={{ flexDirection: 'row' }}>
+            <input type="checkbox" checked={!!d.externo} onChange={(e) => { set('externo', e.target.checked); if (e.target.checked && !d.montoExterno) set('montoExterno', d.monto); }} />
+            <span>Una parte es de compras que no registré en la app</span>
+          </label>
+        )}
+        {d.tipo === 'pago' && d.externo && (
+          <label>¿Cuánto de este pago fue de esas compras?<input className="field" type="number" step="0.01" min="0" value={d.montoExterno || ''} onChange={(e) => set('montoExterno', e.target.value)} /></label>
+        )}
         {d.tipo === 'pago' && d.tarjetaId && (() => {
           const t = data.tarjetas.find((x) => x.id === d.tarjetaId);
           const mes = mesObjetivoTarjeta(t, data, null);
           const e = getEstadoTarjeta(t, data, mes);
-          return <p className="hint">Debes {formatQ(e.pendiente)} para el {formatFechaCorta(e.fechaPago)}{montoNum > 0 ? ` · después del pago: ${formatQ(Math.max(e.pendiente - montoQ, 0))}${montoQ > e.pendiente ? ` (${formatQ(montoQ - e.pendiente)} a favor)` : ''}` : ''}</p>;
+          const extN = d.externo ? Math.min(parseFloat(d.montoExterno) || montoNum || 0, montoNum || 0) : 0;
+          const efectivo = (montoNum - extN) * (d.moneda === 'USD' ? tc : 1);
+          return <p className="hint">Debes {formatQ(e.pendiente)} para el {formatFechaCorta(e.fechaPago)}{montoNum > 0 ? ` · después del pago: ${formatQ(Math.max(e.pendiente - efectivo, 0))}${efectivo > e.pendiente ? ` (${formatQ(efectivo - e.pendiente)} a favor)` : ''}` : ''}</p>;
         })()}
       </div>
       {faltan.length > 0 && <p className="asis-nota warning">Falta: {faltan.join(', ')}.</p>}
@@ -1724,6 +1741,10 @@ function ControlGastos({ user, onIrALogin }) {
   const [pagoTarjetaFecha, setPagoTarjetaFecha] = useState(hoyISO());
   const [monedaPagoTarjeta, setMonedaPagoTarjeta] = useState('GTQ');
   const [tasaPagoTarjeta, setTasaPagoTarjeta] = useState('');
+  const [pagoExterno, setPagoExterno] = useState(false);
+  const [pagoExternoMonto, setPagoExternoMonto] = useState('');
+  const [editExternoId, setEditExternoId] = useState(null);
+  const [editExternoDraft, setEditExternoDraft] = useState('');
   const [tarjetasAbiertas, setTarjetasAbiertas] = useState({});
   const [ajusteSaldoFormId, setAjusteSaldoFormId] = useState(null);
   const [ajusteSaldoDraft, setAjusteSaldoDraft] = useState('');
@@ -2103,11 +2124,32 @@ function ControlGastos({ user, onIrALogin }) {
       monto: esUSD ? val * tc : val,
       ...(esUSD ? { moneda: 'USD', montoOriginal: val, tipoCambioUsado: tc } : {}),
     };
+    if (pagoExterno) {
+      const ext = parseFloat(pagoExternoMonto);
+      const extQ = !isNaN(ext) && ext > 0 ? (esUSD ? ext * tc : ext) : pago.monto;
+      pago.montoExterno = Math.min(extQ, pago.monto);
+    }
     setData((prev) => ({ ...prev, pagosTarjeta: [...(prev.pagosTarjeta || []), pago] }));
+    setPagoExterno(false);
+    setPagoExternoMonto('');
     setPagoTarjetaFormId(null);
     setPagoTarjetaDraft('');
     setTasaPagoTarjeta('');
     setMonedaPagoTarjeta('GTQ');
+  }
+  function guardarExternoPago(id, valor) {
+    const v = parseFloat(valor);
+    setData((prev) => ({
+      ...prev,
+      pagosTarjeta: (prev.pagosTarjeta || []).map((p) => {
+        if (p.id !== id) return p;
+        const { externo, ...resto } = p;
+        if (isNaN(v) || v <= 0) { const { montoExterno, ...sin } = resto; return sin; }
+        return { ...resto, montoExterno: Math.min(v, p.monto) };
+      }),
+    }));
+    setEditExternoId(null);
+    setEditExternoDraft('');
   }
   function removePagoTarjeta(id) {
     setData((prev) => ({ ...prev, pagosTarjeta: (prev.pagosTarjeta || []).filter((p) => p.id !== id) }));
@@ -2197,7 +2239,8 @@ function ControlGastos({ user, onIrALogin }) {
     const usd = esUSD ? { moneda: 'USD', montoOriginal: d.monto, tipoCambioUsado: tc } : {};
     const tarjetaId = d.tipo === 'pago' || d.metodo === 'tarjeta' ? (d.tarjetaId || null) : null;
     if (d.tipo === 'pago') {
-      const pago = { id: uid(), tarjetaId, fecha: d.fecha, monto: montoQ, ...usd };
+      const extN = d.externo ? Math.min(parseFloat(d.montoExterno) || d.monto, d.monto) : 0;
+      const pago = { id: uid(), tarjetaId, fecha: d.fecha, monto: montoQ, ...usd, ...(extN > 0 ? { montoExterno: esUSD ? extN * tc : extN } : {}) };
       setData((prev) => ({ ...prev, pagosTarjeta: [...(prev.pagosTarjeta || []), pago] }));
     } else if (d.tipo === 'fijo') {
       const fijo = { id: uid(), descripcion: d.descripcion.trim(), categoria: d.categoria, monto: montoQ, mesInicio: d.mesInicio,
@@ -3032,6 +3075,7 @@ function ControlGastos({ user, onIrALogin }) {
                                 {t.pagadoMes > 0 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.pagadoMes)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
+                              {t.estado.aFavor > 0.005 && <p className="meta-detail hint-favor">¿No es real? En "Historial de pagos" indica qué parte de tus pagos fue de compras que no registraste.</p>}
                               {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">✓ Estado de cuenta pagado</p>}
                               <button className="abono-link" onClick={() => { setAjusteSaldoDraft(String(t.total)); setAjusteSaldoFormId(t.id); }}>
                                 Ajustar saldo
@@ -3161,6 +3205,9 @@ function ControlGastos({ user, onIrALogin }) {
                                 : `Nada pendiente para el ${formatFechaCorta(resumen.estado.fechaPago)} ✓`}
                               {resumen.ajusteAcumulado > 0.005 && ` · ${formatQ(resumen.ajusteAcumulado)} a favor`}
                             </p>
+                            {resumen.ajusteAcumulado > 0.005 && (
+                              <p className="meta-detail hint-favor">¿No es real? Si pagaste compras que no anotaste en la app, en "Historial de pagos" toca "Compras no registradas" en ese pago e indica cuánto fue.</p>
+                            )}
                             {pagoTarjetaFormId === t.id ? (
                               <div className="abono-form">
                                 <input
@@ -3185,10 +3232,28 @@ function ControlGastos({ user, onIrALogin }) {
                             ) : (
                               <button
                                 className="abono-link"
-                                onClick={() => { setPagoTarjetaDraft(''); setPagoTarjetaFecha(hoyISO()); setMonedaPagoTarjeta('GTQ'); setTasaPagoTarjeta(''); setPagoTarjetaFormId(t.id); }}
+                                onClick={() => { setPagoTarjetaDraft(''); setPagoTarjetaFecha(hoyISO()); setMonedaPagoTarjeta('GTQ'); setTasaPagoTarjeta(''); setPagoExterno(false); setPagoTarjetaFormId(t.id); }}
                               >
                                 + Registrar pago
                               </button>
+                            )}
+                            {pagoTarjetaFormId === t.id && (
+                              <>
+                              <label className="check-externo">
+                                <input type="checkbox" checked={pagoExterno} onChange={(e) => { setPagoExterno(e.target.checked); if (e.target.checked && !pagoExternoMonto) setPagoExternoMonto(pagoTarjetaDraft); }} />
+                                <span>Una parte es de compras que no registré en la app <em>(esa parte no descuenta la deuda que ves aquí)</em></span>
+                              </label>
+                              {pagoExterno && (
+                                <div className="abono-form" style={{ marginTop: 6 }}>
+                                  <input type="number" step="0.01" min="0" className="abono-input" style={{ width: 170 }}
+                                         placeholder={`¿Cuánto? (${monedaPagoTarjeta === 'USD' ? '$' : 'Q'})`}
+                                         value={pagoExternoMonto} onChange={(e) => setPagoExternoMonto(e.target.value)} />
+                                  {parseFloat(pagoTarjetaDraft) > 0 && parseFloat(pagoExternoMonto) >= 0 && (
+                                    <span className="hint">Descuenta de tu deuda: {monedaPagoTarjeta === 'USD' ? '$' : 'Q'} {Math.max(parseFloat(pagoTarjetaDraft) - (parseFloat(pagoExternoMonto) || 0), 0).toFixed(2)}</span>
+                                  )}
+                                </div>
+                              )}
+                              </>
                             )}
                             {pagoTarjetaFormId === t.id && monedaPagoTarjeta === 'USD' && (
                               <div className="abono-form" style={{ marginTop: 6 }}>
@@ -3391,10 +3456,27 @@ function ControlGastos({ user, onIrALogin }) {
                           <div className="row-desc">
                             {p.tarjetaNombre} <span className="cat-name">{formatFechaCorta(parseISODate(p.fecha))}</span>
                             {p.moneda === 'USD' && <span className="pill pill-usd">${p.montoOriginal.toFixed(2)} USD</span>}
+                            {editExternoId === p.id && <span className="hint" style={{ width: '100%' }}>¿Cuánto de este pago fue de compras que no anotaste? Deja vacío o 0 para quitarlo.</span>}
+                            {montoNoRegistrado(p) > 0 && <span className="pill pill-parcial">{montoNoRegistrado(p) >= p.monto - 0.005 ? 'Todo de compras no registradas' : `${formatQ(montoNoRegistrado(p))} de compras no registradas`}</span>}
                           </div>
                         </div>
                         <div className="row-actions">
                           <span className="amount-mono positive">+{formatQ(p.monto)}</span>
+                          {editExternoId === p.id ? (
+                            <span className="abono-form" style={{ marginTop: 0 }}>
+                              <input type="number" step="0.01" min="0" autoFocus className="abono-input" style={{ width: 110 }}
+                                     placeholder="Monto (Q)" value={editExternoDraft}
+                                     onChange={(e) => setEditExternoDraft(e.target.value)}
+                                     onKeyDown={(e) => { if (e.key === 'Enter') guardarExternoPago(p.id, editExternoDraft); if (e.key === 'Escape') setEditExternoId(null); }} />
+                              <button className="icon-btn small" onClick={() => guardarExternoPago(p.id, editExternoDraft)} aria-label="Guardar"><Icon name="check" size={15} /></button>
+                              <button className="icon-btn small" onClick={() => setEditExternoId(null)} aria-label="Cancelar"><Icon name="x" size={15} /></button>
+                            </span>
+                          ) : (
+                            <button className="link-toggle" onClick={() => { setEditExternoId(p.id); setEditExternoDraft(montoNoRegistrado(p) > 0 ? String(+montoNoRegistrado(p).toFixed(2)) : ''); }}
+                                    title="Indica cuánto de este pago fue para compras que no anotaste en la app">
+                              {montoNoRegistrado(p) > 0 ? 'Editar no registradas' : 'Compras no registradas'}
+                            </button>
+                          )}
                           {confirmingId === `pago__${p.id}` ? (
                             <span className="confirm-group">
                               <span className="confirm-warning">¿Eliminar? No se puede deshacer.</span>
@@ -3698,6 +3780,12 @@ const STYLES = `
 .pill-cuota { background:var(--accent-soft); color:var(--accent); }
 .pill-abono { background:rgba(48,209,88,0.16); color:var(--positive); }
 .pill-usd { background:rgba(100,210,255,0.14); color:#64D2FF; }
+.check-externo { display:flex; align-items:flex-start; gap:8px; margin-top:8px; font-size:11.5px; color:var(--text-secondary); cursor:pointer; line-height:1.4; }
+.check-externo input { margin-top:2px; accent-color:var(--accent); }
+.check-externo em { font-style:normal; opacity:0.75; }
+.link-toggle { background:none; border:1px solid var(--border-strong); color:var(--text-secondary); border-radius:8px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; font-family:'Inter', sans-serif; }
+.link-toggle:hover { color:var(--text); }
+.hint-favor { color:#FFB340; }
 .pill-parcial { background:rgba(255,179,64,0.16); color:#FFB340; }
 .desglose-tc { list-style:none; margin:6px 0 0; padding:0; min-width:200px; }
 .desglose-tc li { display:flex; justify-content:space-between; gap:14px; font-size:11.5px; color:var(--text-secondary); padding:2px 0; }

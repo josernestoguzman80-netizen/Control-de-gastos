@@ -175,6 +175,7 @@ const CONSULTAS = [
       'Para que la app cuadre con tu estado de cuenta, por ejemplo cuando el banco cobra intereses o comisiones que la app no calcula.',
       'Escribe lo que todavía debes según el banco. La app guarda la diferencia como un cargo (o descuento) en ese mes y los meses siguientes se siguen sumando normal.',
       'Se aplica al mes que tienes seleccionado arriba, así que ubícate en el mes del estado de cuenta antes de ajustar.',
+      'Los ajustes aparecen como "Ajuste de saldo" en Deuda total y en el historial por mes de la tarjeta. Si uno ya no aplica (por ejemplo, te deja un saldo a favor que no es real), tócale "Quitar" o el ícono de basurero.',
     ] },
   { pregunta: '¿Por qué una compra con tarjeta aparece en otro mes?',
     respuesta: [
@@ -494,11 +495,13 @@ function getEstadoTarjeta(tarjeta, data, mes) {
   const saldoAnterior = cargosAnteriores - pagosAnteriores; // >0 deuda que viene arrastrada, <0 saldo a favor
   const cargosCiclo = cargos.filter((c) => c.mesPago === mes);
   const totalCiclo = cargosCiclo.reduce((a, c) => a + c.monto, 0);
+  const ajustesCiclo = cargosCiclo.filter((c) => c.tipo === 'ajuste').reduce((a, c) => a + c.monto, 0);
+  const comprasCiclo = totalCiclo - ajustesCiclo;
   const pagadoCiclo = pagos.filter((p) => p.fechaISO > isoPagoAnt && p.fechaISO <= isoPago).reduce((a, p) => a + p.monto, 0);
   const neto = saldoAnterior + totalCiclo - pagadoCiclo;
   return {
     fechaPago, fechaCorte: fechaCorteDeMes(tarjeta, mes),
-    saldoAnterior, totalCiclo, pagadoCiclo,
+    saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo,
     pendiente: Math.max(neto, 0),
     aFavor: Math.max(-neto, 0),
     cargosCiclo,
@@ -511,7 +514,6 @@ function getMesesConCargos(tarjeta, data, hastaMes) {
 function getEntradasTarjetaMes(tarjeta, data, mes) {
   const asignado = getAsignacionPagos(tarjeta, data, mes);
   return getEstadoTarjeta(tarjeta, data, mes).cargosCiclo
-    .filter((c) => c.tipo !== 'ajuste')
     .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.monto, pagado: asignado[c.key] || 0,
                    ciclo: { fechaCorte: c.fechaCorte, fechaPago: c.fechaPago, mesPago: c.mesPago } }))
     .sort((a, b) => a.dia - b.dia);
@@ -711,6 +713,7 @@ function categoriasMes(data, mes) {
   return Object.entries(map).map(([id, total]) => ({ id, total })).sort((a, b) => b.total - a.total);
 }
 function nombreEntrada(e) {
+  if (e.tipo === 'ajuste') return 'Ajuste de saldo';
   if (e.tipo === 'cuota') return `${e.item.descripcion} (cuota ${e.item.cuotaActual}/${e.item.numCuotas})`;
   return e.item.descripcion;
 }
@@ -2299,6 +2302,12 @@ function ControlGastos({ user, onIrALogin }) {
     setData({ ingresos: {}, gastos: [], cuotas: [], gastosFijos: [], metas: [], tarjetas: [], gastosTC: [], pagosTarjeta: [], ajustesTarjeta: [], tipoCambio: TIPO_CAMBIO_DEFAULT });
     setConfirmReset(false);
   }
+  function quitarAjustesTarjeta(tarjetaId, mes) {
+    setData((prev) => ({ ...prev, ajustesTarjeta: (prev.ajustesTarjeta || []).filter((a) => !(a.tarjetaId === tarjetaId && a.mes === mes)) }));
+  }
+  function quitarAjuste(id) {
+    setData((prev) => ({ ...prev, ajustesTarjeta: (prev.ajustesTarjeta || []).filter((a) => a.id !== id) }));
+  }
   function ajustarSaldoTarjeta(tarjetaId, montoReal) {
     const val = parseFloat(montoReal);
     if (isNaN(val) || val < 0) return;
@@ -3114,7 +3123,13 @@ function ControlGastos({ user, onIrALogin }) {
                               <ul className="desglose-tc">
                                 {t.estado.saldoAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.saldoAnterior)}</span></li>}
                                 {t.estado.saldoAnterior < -0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(-t.estado.saldoAnterior)}</span></li>}
-                                <li><span>Cargos de este estado</span><span>{formatQ(t.estado.totalCiclo)}</span></li>
+                                <li><span>Cargos de este estado</span><span>{formatQ(t.estado.comprasCiclo)}</span></li>
+                                {Math.abs(t.estado.ajustesCiclo) > 0.005 && (
+                                  <li>
+                                    <span>Ajuste de saldo <button className="link-mini" onClick={() => quitarAjustesTarjeta(t.id, currentMonth)}>Quitar</button></span>
+                                    <span className={t.estado.ajustesCiclo < 0 ? 'positive' : ''}>{t.estado.ajustesCiclo < 0 ? '-' : ''}{formatQ(Math.abs(t.estado.ajustesCiclo))}</span>
+                                  </li>
+                                )}
                                 {t.pagadoMes > 0 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.pagadoMes)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
@@ -3397,6 +3412,32 @@ function ControlGastos({ user, onIrALogin }) {
                                                 )}
                                               </div>
                                               )}
+                                            </li>
+                                          );
+                                        }
+                                        if (e.tipo === 'ajuste') {
+                                          const a = e.item;
+                                          return (
+                                            <li key={`ajuste-${a.id}`} className="ledger-row">
+                                              <div className="row-main">
+                                                <span className="cat-badge tarjeta-badge"><Icon name="pencil" size={14} /></span>
+                                                <div>
+                                                  <div className="row-desc">Ajuste de saldo</div>
+                                                  <p className="meta-detail">Hecho con "Ajustar saldo"</p>
+                                                </div>
+                                              </div>
+                                              <div className="row-actions">
+                                                <span className={`amount-mono ${a.monto < 0 ? 'positive' : 'negative'}`}>{a.monto < 0 ? '+' : '-'}{formatQ(Math.abs(a.monto))}</span>
+                                                {confirmingId === `ajuste__${a.id}` ? (
+                                                  <span className="confirm-group">
+                                                    <span className="confirm-warning">¿Quitar ajuste?</span>
+                                                    <button className="btn-add danger small" onClick={() => { quitarAjuste(a.id); setConfirmingId(null); }}>Sí, quitar</button>
+                                                    <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                                                  </span>
+                                                ) : (
+                                                  <button className="icon-btn small danger" onClick={() => setConfirmingId(`ajuste__${a.id}`)} aria-label="Quitar ajuste"><Icon name="trash" size={14} /></button>
+                                                )}
+                                              </div>
                                             </li>
                                           );
                                         }
@@ -3836,7 +3877,7 @@ const STYLES = `
 .check-externo em { font-style:normal; opacity:0.75; }
 .link-toggle { background:none; border:1px solid var(--border-strong); color:var(--text-secondary); border-radius:8px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; font-family:'Inter', sans-serif; }
 .link-toggle:hover { color:var(--text); }
-.hint-favor { color:#FFB340; }
+.link-mini { background:none; border:none; color:var(--accent); font-size:11px; text-decoration:underline; cursor:pointer; padding:0 0 0 6px; font-family:'Inter', sans-serif; }
 .pill-parcial { background:rgba(255,179,64,0.16); color:#FFB340; }
 .desglose-tc { list-style:none; margin:6px 0 0; padding:0; min-width:200px; }
 .desglose-tc li { display:flex; justify-content:space-between; gap:14px; font-size:11.5px; color:var(--text-secondary); padding:2px 0; }

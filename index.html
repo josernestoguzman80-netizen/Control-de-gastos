@@ -184,7 +184,12 @@ const CONSULTAS = [
       'Las compras y pagos anteriores a esa fecha quedan como ya incluidos: las compras más antiguas se marcan como pagadas y lo pendiente se asigna a las más recientes. Lo que compres o pagues después se suma o resta normal.',
       'Los ajustes se ven solo en Ajustes → Ajustes de saldo. Si uno ya no aplica (por ejemplo, te deja un saldo a favor que no es real), quítalo con el ícono de basurero.',
     ] },
-  { pregunta: '¿Por qué una compra con tarjeta aparece en otro mes?',
+  { pregunta: '¿Cómo calcula la app lo que debo en la tarjeta?',
+    respuesta: [
+      'Por defecto usa "saldo al día": lo que compras hoy suma a tu deuda hoy, y lo que pagas hoy la baja hoy. En cada mes ves lo que debías al cierre de ese mes (o a hoy, si es el mes actual).',
+      'Si prefieres ver lo que vence en cada fecha de pago según el corte, enciende Ajustes → Configuración → "Calcular tarjetas por fecha de corte".',
+    ] },
+  { pregunta: '¿Por qué una compra con tarjeta aparece en otro mes? (modo por corte)',
     respuesta: [
       'Las compras con tarjeta se agrupan por el mes en que se pagan, no por el mes en que compraste. Una compra hecha después del día de corte entra en el siguiente corte y se paga en la fecha de pago de ese ciclo.',
       'Esto aplica también a gastos únicos, gastos fijos y cuotas que marques con tarjeta.',
@@ -558,7 +563,44 @@ function getAsignacionPagos(tarjeta, data, hastaMes) {
   return asignado;
 }
 // Estado de cuenta del mes en que vence el pago (`mes`).
+function modoPorCorte(data) { return !!(data && data.config && data.config.modoTarjeta === 'corte'); }
 function getEstadoTarjeta(tarjeta, data, mes) {
+  return modoPorCorte(data) ? getEstadoTarjetaCorte(tarjeta, data, mes) : getEstadoTarjetaSaldo(tarjeta, data, mes);
+}
+// Modo "saldo al día" (predeterminado): cada compra suma a la deuda el mismo día en que la haces
+// y cada pago resta el día que lo haces. Cada mes muestra el saldo al cierre de ese mes (o a hoy).
+function getEstadoTarjetaSaldo(tarjeta, data, mes) {
+  const hoy = hoyISO();
+  const inicioMes = `${mes}-01`;
+  const finMes = isoDeMes(mes, 31);
+  const limite = mes === hoy.slice(0, 7) ? hoy : finMes;
+  const cargos = getCargosTarjeta(tarjeta, data, addMonths(mes, 3)).filter((c) => c.fecha <= limite);
+  const pagos = getPagosDeTarjeta(tarjeta, data).filter((p) => p.fechaISO <= limite);
+  const cargosAnteriores = cargos.filter((c) => c.fecha < inicioMes).reduce((a, c) => a + c.monto, 0);
+  const pagosAnteriores = pagos.filter((p) => p.fechaISO < inicioMes).reduce((a, p) => a + p.monto, 0);
+  const saldoAnterior = redondear(cargosAnteriores - pagosAnteriores);
+  const cargosCiclo = cargos.filter((c) => c.fecha >= inicioMes);
+  const totalCiclo = redondear(cargosCiclo.reduce((a, c) => a + c.monto, 0));
+  const ajustesCiclo = cargosCiclo.filter((c) => c.tipo === 'ajuste').reduce((a, c) => a + c.monto, 0);
+  const concilCiclo = redondear(cargosCiclo.filter((c) => c.conciliado || c.key === `concil_${tarjeta.id}`).reduce((a, c) => a + c.monto, 0));
+  const inicialCiclo = cargosCiclo.filter((c) => c.tipo === 'inicial' && !c.conciliado).reduce((a, c) => a + c.monto, 0);
+  const comprasCiclo = redondear(totalCiclo - ajustesCiclo - inicialCiclo - concilCiclo);
+  const pagadoCiclo = redondear(pagos.filter((p) => p.fechaISO >= inicioMes).reduce((a, p) => a + p.monto, 0));
+  const neto = saldoAnterior + totalCiclo - pagadoCiclo;
+  const deudaAnterior = Math.max(saldoAnterior, 0);
+  return {
+    modo: 'saldo', fechaSaldo: parseISODate(limite),
+    fechaPago: primeraFechaPagoDespues(tarjeta, limite < hoy ? limite : hoy), fechaCorte: fechaCorteDeMes(tarjeta, mes),
+    saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo, inicialCiclo, concilCiclo,
+    pendienteAnterior: Math.max(deudaAnterior - pagadoCiclo, 0),
+    favorAnterior: Math.max(-saldoAnterior, 0),
+    pagosDelCiclo: Math.max(pagadoCiclo - deudaAnterior, 0),
+    pendiente: Math.max(redondear(neto), 0),
+    aFavor: Math.max(redondear(-neto), 0),
+    cargosCiclo,
+  };
+}
+function getEstadoTarjetaCorte(tarjeta, data, mes) {
   const cargos = getCargosTarjeta(tarjeta, data, mes);
   const pagos = getPagosDeTarjeta(tarjeta, data);
   const fechaPago = fechaPagoDeMes(tarjeta, mes);
@@ -2918,7 +2960,7 @@ function ControlGastos({ user, onIrALogin }) {
                       <div className="row-desc">
                         Pago de {t.nombre} <span className="pill pill-usd">TC</span>
                       </div>
-                      <p className="meta-detail">Pendiente para el {formatFechaCorta(t.fechaPago)} · se descuenta al registrar el pago</p>
+                      <p className="meta-detail">{modoPorCorte(data) ? `Pendiente para el ${formatFechaCorta(t.fechaPago)} · se descuenta al registrar el pago` : 'Saldo de la tarjeta · se descuenta al registrar el pago'}</p>
                     </div>
                   </div>
                   <div className="row-actions">
@@ -3226,7 +3268,9 @@ function ControlGastos({ user, onIrALogin }) {
           {data.tarjetas.length > 0 && (
             <div className="card">
               <h2 className="section-title">Deuda total</h2>
-              <p className="section-sub">Lo que vence en {monthLabel(currentMonth)}, incluyendo lo que quedó pendiente de meses anteriores.</p>
+              <p className="section-sub">{modoPorCorte(data)
+                ? `Lo que vence en ${monthLabel(currentMonth)}, incluyendo lo que quedó pendiente de meses anteriores.`
+                : (currentMonth === hoyISO().slice(0, 7) ? 'Lo que debes hoy en tus tarjetas: cada compra suma el día que la haces y cada pago resta el día que lo haces.' : `Lo que debías al cierre de ${monthLabel(currentMonth)}.`)}</p>
               <div className="saldo-highlight">
                 <div className="balance-line no-pad">
                   <span className="label total-label">Debes en total</span>
@@ -3274,17 +3318,19 @@ function ControlGastos({ user, onIrALogin }) {
                             <span className="cat-badge tarjeta-badge"><Icon name="creditCard" size={16} /></span>
                             <div>
                               <div className="row-desc">{t.nombre}</div>
-                              <p className="meta-detail">Vence el {formatFechaCorta(t.estado.fechaPago)}</p>
+                              <p className="meta-detail">{t.estado.modo === 'saldo'
+                                ? `Saldo al ${formatFechaCorta(t.estado.fechaSaldo)} · próximo pago ${formatFechaCorta(t.estado.fechaPago)}`
+                                : `Vence el ${formatFechaCorta(t.estado.fechaPago)}`}</p>
                               <ul className="desglose-tc">
                                 {t.estado.pendienteAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.pendienteAnterior)}</span></li>}
                                 {t.estado.favorAnterior > 0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(t.estado.favorAnterior)}</span></li>}
                                 {t.estado.inicialCiclo > 0.005 && <li><span>Saldo que ya debías</span><span>{formatQ(t.estado.inicialCiclo)}</span></li>}
                                 {t.estado.concilCiclo > 0.005 && (() => { const tj = data.tarjetas.find((x) => x.id === t.id); return <li><span>Saldo según tu banco al {formatFechaCorta(parseISODate(tj.conciliacion.fecha))}</span><span>{formatQ(t.estado.concilCiclo)}</span></li>; })()}
-                                {(t.estado.comprasCiclo + t.estado.ajustesCiclo > 0.005 || t.estado.concilCiclo <= 0.005) && <li><span>{t.estado.concilCiclo > 0.005 ? 'Compras nuevas' : 'Cargos de este estado'}</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>}
+                                {(t.estado.comprasCiclo + t.estado.ajustesCiclo > 0.005 || t.estado.concilCiclo <= 0.005) && <li><span>{t.estado.concilCiclo > 0.005 ? 'Compras nuevas' : t.estado.modo === 'saldo' ? 'Compras del mes' : 'Cargos de este estado'}</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>}
                                 {t.estado.pagosDelCiclo > 0.005 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.estado.pagosDelCiclo)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
-                              {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">✓ Estado de cuenta pagado</p>}
+                              {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">{t.estado.modo === 'saldo' ? '✓ Sin saldo pendiente' : '✓ Estado de cuenta pagado'}</p>}
                               <button className="abono-link" onClick={() => { setAjusteSaldoDraft(''); setAjusteFechaDraft(hoyISO()); setAjusteSaldoFormId(t.id); }}>
                                 Ajustar saldo
                               </button>
@@ -3409,7 +3455,9 @@ function ControlGastos({ user, onIrALogin }) {
                           <div className="cuota-body">
                             <div className="row-desc">{t.nombre}</div>
                             <p className="meta-detail">
-                              {totalMesActual > 0.005
+                              {resumen.estado.modo === 'saldo'
+                                ? (totalMesActual > 0.005 ? `Saldo al ${formatFechaCorta(resumen.estado.fechaSaldo)}: ${formatQ(totalMesActual)}` : `Sin saldo pendiente ✓`)
+                                : totalMesActual > 0.005
                                 ? `Por pagar el ${formatFechaCorta(resumen.estado.fechaPago)}: ${formatQ(totalMesActual)}`
                                 : `Nada pendiente para el ${formatFechaCorta(resumen.estado.fechaPago)} ✓`}
                               {resumen.ajusteAcumulado > 0.005 && ` · ${formatQ(resumen.ajusteAcumulado)} a favor`}
@@ -3926,6 +3974,17 @@ function ControlGastos({ user, onIrALogin }) {
           <div className="card">
             <h2 className="section-title">Configuración</h2>
             <p className="section-sub">Ajustes generales de la app.</p>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-title">Calcular tarjetas por fecha de corte</div>
+                <p className="meta-detail">Apagado (recomendado): cada compra suma a tu deuda el día que la haces. Encendido: las compras se cobran en la fecha de pago de su corte.</p>
+              </div>
+              <button type="button" role="switch" aria-checked={modoPorCorte(data)}
+                      className={`switch ${modoPorCorte(data) ? 'on' : ''}`}
+                      onClick={() => setData((prev) => ({ ...prev, config: { ...(prev.config || {}), modoTarjeta: modoPorCorte(prev) ? 'saldo' : 'corte' } }))}>
+                <span className="switch-knob" />
+              </button>
+            </div>
             <div className="settings-row">
               <div>
                 <div className="settings-row-title">Marcar compras como pagadas</div>

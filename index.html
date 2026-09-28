@@ -180,8 +180,8 @@ const CONSULTAS = [
   { pregunta: '¿Para qué sirve "Ajustar saldo"?',
     respuesta: [
       'Para que la app cuadre con tu estado de cuenta, por ejemplo cuando el banco cobra intereses o comisiones que la app no calcula.',
-      'Escribe lo que todavía debes según el banco. La app guarda la diferencia como un cargo (o descuento) en ese mes y los meses siguientes se siguen sumando normal.',
-      'Se aplica al mes que tienes seleccionado arriba, así que ubícate en el mes del estado de cuenta antes de ajustar.',
+      'Escribe lo que debes según el banco y la fecha de ese saldo. Desde esa fecha la app toma ese monto como lo que te falta pagar en tu siguiente fecha de pago.',
+      'Las compras y pagos anteriores a esa fecha quedan como ya incluidos: las compras más antiguas se marcan como pagadas y lo pendiente se asigna a las más recientes. Lo que compres o pagues después se suma o resta normal.',
       'Los ajustes se ven solo en Ajustes → Ajustes de saldo. Si uno ya no aplica (por ejemplo, te deja un saldo a favor que no es real), quítalo con el ícono de basurero.',
     ] },
   { pregunta: '¿Por qué una compra con tarjeta aparece en otro mes?',
@@ -198,6 +198,12 @@ const CONSULTAS = [
     respuesta: [
       'Los gastos fijos en dólares (como suscripciones) se recalculan cada vez que cambias el tipo de cambio, porque cada mes se cobran a la tasa del día.',
       'Las compras únicas, compras con tarjeta y cuotas en dólares conservan la tasa con la que las registraste.',
+    ] },
+  { pregunta: '¿Cómo marco una compra como pagada sin registrar un pago?',
+    respuesta: [
+      'Enciende Ajustes → Configuración → "Marcar compras como pagadas". En Tarjetas, dentro del historial de cada tarjeta, aparecerá "Marcar pagada" en las compras pendientes.',
+      'Una compra marcada deja de sumar a lo que debes. Para deshacerlo toca "Quitar pagada". Si apagas el interruptor, los botones se ocultan pero lo que ya marcaste se conserva.',
+      'Marcar una compra no registra un pago, así que tu saldo en Inicio no cambia.',
     ] },
   { pregunta: '¿La app calcula intereses de la tarjeta?',
     respuesta: [
@@ -431,11 +437,56 @@ function fechaCorteDeMes(tarjeta, mes) {
   const mesCorte = addMonths(mes, -1);
   return parseISODate(isoDeMes(mesCorte, tarjeta.diaCorte));
 }
+function primeraFechaPagoDespues(tarjeta, iso) {
+  // Primera fecha de pago estrictamente después de `iso`.
+  const f = parseISODate(iso);
+  const [yy, mm] = [f.getFullYear(), f.getMonth() + 1];
+  let fp = fechaEnMes(yy, mm, tarjeta.diaPago);
+  if (fp <= f) fp = mm === 12 ? fechaEnMes(yy + 1, 1, tarjeta.diaPago) : fechaEnMes(yy, mm + 1, tarjeta.diaPago);
+  return fp;
+}
 function getCargosTarjeta(tarjeta, data, hastaMes) {
+  const conc = tarjeta.conciliacion && tarjeta.conciliacion.fecha ? tarjeta.conciliacion : null;
+  const horizonte = conc && addMonths(conc.fecha.slice(0, 7), 2) > hastaMes ? addMonths(conc.fecha.slice(0, 7), 2) : hastaMes;
+  let cargos = construirCargosTarjeta(tarjeta, data, horizonte);
+  // Compras marcadas a mano como "Pagada" (Ajustes → Marcar compras como pagadas).
+  const manual = data.pagadasManual || {};
+  cargos.forEach((c) => {
+    if (manual[c.key] && c.monto > 0) { c.montoOriginal = c.monto; c.liquidado = c.monto; c.monto = 0; c.pagadaManual = true; }
+  });
+  if (conc) {
+    // "Ajustar saldo" = corte de cuentas: al día del ajuste, lo que debes es EXACTAMENTE el saldo que escribiste.
+    // Las compras hasta ese día quedan pagadas (de la más antigua a la más reciente) y lo que falta
+    // vence en la siguiente fecha de pago. Lo que compres después se suma normal.
+    const D = conc.fecha;
+    const B = redondear(conc.saldo);
+    const fp = primeraFechaPagoDespues(tarjeta, D);
+    const mesSnap = monthKey(fp);
+    cargos = cargos.filter((c) => !(c.tipo === 'ajuste' && c.fecha <= D)); // ajustes viejos quedan reemplazados
+    const previos = cargos.filter((c) => c.fecha <= D).sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+    const T = redondear(previos.reduce((a, c) => a + c.monto, 0));
+    let cubrir = Math.max(redondear(T - B), 0);
+    previos.forEach((c) => {
+      const cubre = redondear(Math.min(c.monto, cubrir));
+      cubrir = redondear(cubrir - cubre);
+      if (c.montoOriginal == null) c.montoOriginal = c.monto;
+      c.liquidado = redondear((c.liquidado || 0) + cubre);
+      c.monto = redondear(c.monto - cubre);
+      if (c.monto > 0.005) { c.conciliado = true; c.mesPago = mesSnap; c.fechaPago = fp; c.fechaCorte = parseISODate(D); }
+    });
+    if (B > T + 0.005) {
+      cargos.push({ key: `concil_${tarjeta.id}`, tipo: 'inicial', fecha: D, monto: redondear(B - T), conciliado: true,
+                    item: { descripcion: 'Saldo del banco no registrado en la app' }, dia: parseISODate(D).getDate(),
+                    mesPago: mesSnap, fechaCorte: parseISODate(D), fechaPago: fp });
+    }
+  }
+  return cargos.filter((c) => c.mesPago <= hastaMes).sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+}
+function construirCargosTarjeta(tarjeta, data, hastaMes) {
   const cargos = [];
   function add(c) {
     const ciclo = calcularCicloTC(c.fecha, tarjeta.diaCorte, tarjeta.diaPago);
-    if (ciclo.mesPago <= hastaMes) cargos.push({ ...c, ...ciclo });
+    if (ciclo.mesPago <= hastaMes) cargos.push({ ...c, monto: redondear(c.monto), ...ciclo });
   }
   data.gastosTC.filter((g) => g.tarjetaId === tarjeta.id).forEach((g) => {
     add({ key: `tc_${g.id}`, tipo: 'tc', fecha: g.fechaCompra, monto: g.monto, item: g, dia: parseISODate(g.fechaCompra).getDate() });
@@ -466,27 +517,31 @@ function getCargosTarjeta(tarjeta, data, hastaMes) {
     if (fp < f) fp = mm === 12 ? fechaEnMes(yy + 1, 1, tarjeta.diaPago) : fechaEnMes(yy, mm + 1, tarjeta.diaPago);
     const mesPago = monthKey(fp);
     if (mesPago <= hastaMes) {
-      cargos.push({ key: `inicial_${tarjeta.id}`, tipo: 'inicial', fecha: tarjeta.fechaSaldoInicial, monto: tarjeta.saldoInicial,
+      cargos.push({ key: `inicial_${tarjeta.id}`, tipo: 'inicial', fecha: tarjeta.fechaSaldoInicial, monto: redondear(tarjeta.saldoInicial),
                     item: { descripcion: 'Saldo que ya debías' }, dia: f.getDate(), mesPago, fechaCorte: fechaCorteDeMes(tarjeta, mesPago), fechaPago: fp });
     }
   }
   // Ajustes manuales ("Ajustar saldo"): se suman directo al estado de ese mes.
   (data.ajustesTarjeta || []).filter((a) => a.tarjetaId === tarjeta.id && a.mes <= hastaMes).forEach((a) => {
     const fc = fechaCorteDeMes(tarjeta, a.mes);
-    cargos.push({ key: `ajuste_${a.id}`, tipo: 'ajuste', fecha: isoDeFecha(fc), monto: a.monto, item: a, dia: fc.getDate(),
+    cargos.push({ key: `ajuste_${a.id}`, tipo: 'ajuste', fecha: isoDeFecha(fc), monto: redondear(a.monto), item: a, dia: fc.getDate(),
                   mesPago: a.mes, fechaCorte: fc, fechaPago: fechaPagoDeMes(tarjeta, a.mes) });
   });
-  return cargos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  return cargos;
 }
+function redondear(n) { return Math.round((Number(n) || 0) * 100) / 100; } // a centavos, como el banco
 function montoNoRegistrado(p) {
   if (p.externo) return p.monto; // versión anterior: todo el pago
   return Math.min(Math.max(p.montoExterno || 0, 0), p.monto);
 }
 function getPagosDeTarjeta(tarjeta, data) {
   // La parte de un pago que fue para compras no registradas en la app no descuenta la deuda que la app conoce.
+  const conc = tarjeta.conciliacion && tarjeta.conciliacion.fecha ? tarjeta.conciliacion : null;
+  // Pagos anteriores al ajuste ya están incluidos en el saldo que escribiste; los de después sí cuentan.
+  const incluidoEnAjuste = (p) => conc && (p.fechaISO < conc.fecha || (p.fechaISO === conc.fecha && !((p.creado || 0) > (conc.creado || 0))));
   return (data.pagosTarjeta || []).filter((p) => p.tarjetaId === tarjeta.id)
-    .map((p) => ({ ...p, monto: p.monto - montoNoRegistrado(p), fechaISO: p.fecha || isoDeMes(p.mes, tarjeta.diaPago) }))
-    .filter((p) => p.monto > 0.005);
+    .map((p) => ({ ...p, monto: redondear(p.monto - montoNoRegistrado(p)), fechaISO: p.fecha || isoDeMes(p.mes, tarjeta.diaPago) }))
+    .filter((p) => p.monto > 0.005 && !incluidoEnAjuste(p));
 }
 // Reparte TODOS los pagos registrados entre los cargos, del más antiguo al más reciente.
 function getAsignacionPagos(tarjeta, data, hastaMes) {
@@ -496,9 +551,9 @@ function getAsignacionPagos(tarjeta, data, hastaMes) {
   disponible += getCargosTarjeta(tarjeta, data, hastaMes).filter((c) => c.monto < 0).reduce((a, c) => a - c.monto, 0);
   const asignado = {};
   cargos.forEach((c) => {
-    const aplicado = Math.min(c.monto, Math.max(disponible, 0));
+    const aplicado = redondear(Math.min(c.monto, Math.max(disponible, 0)));
     asignado[c.key] = aplicado;
-    disponible -= aplicado;
+    disponible = redondear(disponible - aplicado);
   });
   return asignado;
 }
@@ -515,8 +570,9 @@ function getEstadoTarjeta(tarjeta, data, mes) {
   const cargosCiclo = cargos.filter((c) => c.mesPago === mes);
   const totalCiclo = cargosCiclo.reduce((a, c) => a + c.monto, 0);
   const ajustesCiclo = cargosCiclo.filter((c) => c.tipo === 'ajuste').reduce((a, c) => a + c.monto, 0);
-  const inicialCiclo = cargosCiclo.filter((c) => c.tipo === 'inicial').reduce((a, c) => a + c.monto, 0);
-  const comprasCiclo = totalCiclo - ajustesCiclo - inicialCiclo;
+  const concilCiclo = redondear(cargosCiclo.filter((c) => c.conciliado).reduce((a, c) => a + c.monto, 0));
+  const inicialCiclo = cargosCiclo.filter((c) => c.tipo === 'inicial' && !c.conciliado).reduce((a, c) => a + c.monto, 0);
+  const comprasCiclo = redondear(totalCiclo - ajustesCiclo - inicialCiclo - concilCiclo);
   // Un pago cuenta para este estado si se hizo hasta su fecha de pago, o hasta hoy si ya pasó (pago atrasado).
   const hoy = hoyISO();
   const limite = isoPago > hoy ? isoPago : hoy;
@@ -529,10 +585,10 @@ function getEstadoTarjeta(tarjeta, data, mes) {
   const pagosDelCiclo = Math.max(pagadoCiclo - deudaAnterior, 0);          // pagos que quedan para este estado
   return {
     fechaPago, fechaCorte: fechaCorteDeMes(tarjeta, mes),
-    saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo, inicialCiclo,
+    saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo, inicialCiclo, concilCiclo,
     pendienteAnterior, favorAnterior, pagosDelCiclo,
-    pendiente: Math.max(neto, 0),
-    aFavor: Math.max(-neto, 0),
+    pendiente: Math.max(redondear(neto), 0),
+    aFavor: Math.max(redondear(-neto), 0),
     cargosCiclo,
   };
 }
@@ -544,7 +600,8 @@ function getEntradasTarjetaMes(tarjeta, data, mes) {
   const asignado = getAsignacionPagos(tarjeta, data, mes);
   return getEstadoTarjeta(tarjeta, data, mes).cargosCiclo
     .filter((c) => c.tipo !== 'ajuste') // los ajustes de saldo solo se ven en Ajustes
-    .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.monto, pagado: asignado[c.key] || 0,
+    .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.montoOriginal != null ? c.montoOriginal : c.monto,
+                   pagado: redondear((c.liquidado || 0) + (asignado[c.key] || 0)),
                    ciclo: { fechaCorte: c.fechaCorte, fechaPago: c.fechaPago, mesPago: c.mesPago } }))
     .sort((a, b) => a.dia - b.dia);
 }
@@ -554,7 +611,8 @@ function getComprasTarjetaPorMes(tarjeta, data, hastaMes) {
   const asignado = getAsignacionPagos(tarjeta, data, horizonte);
   return getCargosTarjeta(tarjeta, data, horizonte)
     .filter((c) => c.tipo !== 'ajuste' && c.fecha.slice(0, 7) <= hastaMes)
-    .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.monto, pagado: asignado[c.key] || 0, mesCompra: c.fecha.slice(0, 7),
+    .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.montoOriginal != null ? c.montoOriginal : c.monto,
+                   pagado: redondear((c.liquidado || 0) + (asignado[c.key] || 0)), mesCompra: c.fecha.slice(0, 7), key: c.key, pagadaManual: !!c.pagadaManual,
                    ciclo: { fechaCorte: c.fechaCorte, fechaPago: c.fechaPago, mesPago: c.mesPago } }));
 }
 function getResumenTarjetaMes(tarjeta, data, mes) {
@@ -566,7 +624,7 @@ function getTotalTarjetaMes(tarjeta, data, mes) {
 }
 function EstadoPagoPill({ e }) {
   if (!e || !(e.monto > 0) || !(e.pagado > 0)) return null;
-  if (e.pagado >= e.monto - 0.005) return <span className="pill pill-abono">✓ Pagada</span>;
+  if (e.pagado >= e.monto - 0.009) return <span className="pill pill-abono">✓ Pagada</span>;
   return <span className="pill pill-parcial">Pagado {formatQ(e.pagado)}</span>;
 }
 
@@ -1837,6 +1895,7 @@ function ControlGastos({ user, onIrALogin }) {
   const [tarjetasAbiertas, setTarjetasAbiertas] = useState({});
   const [ajusteSaldoFormId, setAjusteSaldoFormId] = useState(null);
   const [ajusteSaldoDraft, setAjusteSaldoDraft] = useState('');
+  const [ajusteFechaDraft, setAjusteFechaDraft] = useState(hoyISO());
   const [mesesTarjetaAbiertos, setMesesTarjetaAbiertos] = useState({});
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(76);
@@ -1874,6 +1933,8 @@ function ControlGastos({ user, onIrALogin }) {
             pagosTarjeta: parsed.pagosTarjeta || [],
             ajustesTarjeta: parsed.ajustesTarjeta || [],
             tipoCambio: typeof parsed.tipoCambio === 'number' ? parsed.tipoCambio : TIPO_CAMBIO_DEFAULT,
+            pagadasManual: parsed.pagadasManual || {},
+            config: parsed.config || {},
           });
         }
       } catch (e) {
@@ -2221,6 +2282,7 @@ function ControlGastos({ user, onIrALogin }) {
     const tc = esUSD ? ((!isNaN(tasaEspecifica) && tasaEspecifica > 0) ? tasaEspecifica : (data.tipoCambio || TIPO_CAMBIO_DEFAULT)) : null;
     const pago = {
       id: uid(),
+      creado: Date.now(),
       tarjetaId,
       fecha: pagoTarjetaFecha,
       monto: esUSD ? val * tc : val,
@@ -2342,7 +2404,7 @@ function ControlGastos({ user, onIrALogin }) {
     const tarjetaId = d.tipo === 'pago' || d.metodo === 'tarjeta' ? (d.tarjetaId || null) : null;
     if (d.tipo === 'pago') {
       const extN = d.externo ? Math.min(parseFloat(d.montoExterno) || d.monto, d.monto) : 0;
-      const pago = { id: uid(), tarjetaId, fecha: d.fecha, monto: montoQ, ...usd, ...(extN > 0 ? { montoExterno: esUSD ? extN * tc : extN } : {}) };
+      const pago = { id: uid(), creado: Date.now(), tarjetaId, fecha: d.fecha, monto: montoQ, ...usd, ...(extN > 0 ? { montoExterno: esUSD ? extN * tc : extN } : {}) };
       setData((prev) => ({ ...prev, pagosTarjeta: [...(prev.pagosTarjeta || []), pago] }));
     } else if (d.tipo === 'fijo') {
       const fijo = { id: uid(), descripcion: d.descripcion.trim(), categoria: d.categoria, monto: montoQ, mesInicio: d.mesInicio,
@@ -2352,6 +2414,38 @@ function ControlGastos({ user, onIrALogin }) {
       const gasto = { id: uid(), descripcion: d.descripcion.trim(), categoria: d.categoria, monto: montoQ, mes: d.fecha.slice(0, 7),
                       dia: parseISODate(d.fecha).getDate(), fecha: d.fecha, metodoPago: d.metodo, tarjetaId, ...usd };
       setData((prev) => ({ ...prev, gastos: [...prev.gastos, gasto] }));
+    }
+  }
+  function togglePagadaManual(key) {
+    setData((prev) => {
+      const actual = { ...(prev.pagadasManual || {}) };
+      if (actual[key]) delete actual[key]; else actual[key] = true;
+      return { ...prev, pagadasManual: actual };
+    });
+  }
+  function setMarcarPagadas(valor) {
+    setData((prev) => ({ ...prev, config: { ...(prev.config || {}), marcarPagadas: valor } }));
+  }
+  function botonPagada(e) {
+    if (!(data.config && data.config.marcarPagadas) || !e.key) return null;
+    if (e.pagadaManual) return <button className="link-toggle" onClick={() => togglePagadaManual(e.key)}>Quitar pagada</button>;
+    if (e.pagado >= e.monto - 0.009) return null; // ya está cubierta por tus pagos
+    return <button className="link-toggle" onClick={() => togglePagadaManual(e.key)}>Marcar pagada</button>;
+  }
+  function exportarDatos() {
+    try {
+      const contenido = JSON.stringify({ app: 'CoinPocket', exportado: new Date().toISOString(), datos: data }, null, 2);
+      const blob = new Blob([contenido], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `coinpocket-datos-${hoyISO()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      console.error('No se pudo exportar', e);
     }
   }
   function confirmResetAll() {
@@ -2364,18 +2458,19 @@ function ControlGastos({ user, onIrALogin }) {
   function quitarAjuste(id) {
     setData((prev) => ({ ...prev, ajustesTarjeta: (prev.ajustesTarjeta || []).filter((a) => a.id !== id) }));
   }
-  function ajustarSaldoTarjeta(tarjetaId, montoReal) {
+  function ajustarSaldoTarjeta(tarjetaId, montoReal, fecha) {
+    // Corte de cuentas: a esta fecha debes exactamente este monto. Lo anterior queda pagado.
     const val = parseFloat(montoReal);
     if (isNaN(val) || val < 0) return;
-    const t = data.tarjetas.find((x) => x.id === tarjetaId);
-    if (!t) return;
-    const actual = getTotalTarjetaMes(t, data, currentMonth);
-    const diferencia = val - actual;
-    if (diferencia === 0) return;
     setData((prev) => ({
       ...prev,
-      ajustesTarjeta: [...(prev.ajustesTarjeta || []), { id: uid(), tarjetaId, mes: currentMonth, monto: diferencia }],
+      tarjetas: prev.tarjetas.map((t) => t.id === tarjetaId ? { ...t, conciliacion: { fecha: fecha || hoyISO(), saldo: val, creado: Date.now() } } : t),
+      // los ajustes viejos de esta tarjeta quedan reemplazados por este saldo
+      ajustesTarjeta: (prev.ajustesTarjeta || []).filter((a) => a.tarjetaId !== tarjetaId),
     }));
+  }
+  function quitarConciliacion(tarjetaId) {
+    setData((prev) => ({ ...prev, tarjetas: prev.tarjetas.map((t) => { if (t.id !== tarjetaId) return t; const { conciliacion, ...resto } = t; return resto; }) }));
   }
 
   if (!loaded) {
@@ -3148,21 +3243,25 @@ function ControlGastos({ user, onIrALogin }) {
                       {ajusteSaldoFormId === t.id ? (
                         <div className="form-grid" style={{ width: '100%' }}>
                           <p className="hint" style={{ color: 'var(--text-secondary)' }}>
-                            Ahora la app calcula {formatQ(t.total)} para {t.nombre}. Escribe lo que dice tu estado de cuenta y se ajusta.
+                            Escribe lo que debes en {t.nombre} según tu banco. Desde esa fecha la app toma ese monto como lo que te falta pagar: lo anterior queda como pagado y lo que compres después se suma.
                           </p>
                           <input
                             type="number" step="0.01" min="0" autoFocus
-                            className="field" placeholder="Lo que debes según tu estado de cuenta (Q)"
+                            className="field" placeholder="Lo que debes según tu banco (Q)"
                             value={ajusteSaldoDraft}
                             onChange={(e) => setAjusteSaldoDraft(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') { ajustarSaldoTarjeta(t.id, ajusteSaldoDraft); setAjusteSaldoFormId(null); setAjusteSaldoDraft(''); }
+                              if (e.key === 'Enter') { ajustarSaldoTarjeta(t.id, ajusteSaldoDraft, ajusteFechaDraft); setAjusteSaldoFormId(null); setAjusteSaldoDraft(''); }
                               if (e.key === 'Escape') setAjusteSaldoFormId(null);
                             }}
                           />
+                          <label className="field-label">
+                            Saldo a la fecha
+                            <input type="date" className="field" value={ajusteFechaDraft} onChange={(e) => setAjusteFechaDraft(e.target.value)} />
+                          </label>
                           <div className="monto-row">
                             <button className="btn-add" style={{ flex: 1 }}
-                                    onClick={() => { ajustarSaldoTarjeta(t.id, ajusteSaldoDraft); setAjusteSaldoFormId(null); setAjusteSaldoDraft(''); }}
+                                    onClick={() => { ajustarSaldoTarjeta(t.id, ajusteSaldoDraft, ajusteFechaDraft); setAjusteSaldoFormId(null); setAjusteSaldoDraft(''); }}
                                     disabled={!ajusteSaldoDraft || parseFloat(ajusteSaldoDraft) < 0}>
                               <Icon name="check" size={15} /> Ajustar
                             </button>
@@ -3180,12 +3279,13 @@ function ControlGastos({ user, onIrALogin }) {
                                 {t.estado.pendienteAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.pendienteAnterior)}</span></li>}
                                 {t.estado.favorAnterior > 0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(t.estado.favorAnterior)}</span></li>}
                                 {t.estado.inicialCiclo > 0.005 && <li><span>Saldo que ya debías</span><span>{formatQ(t.estado.inicialCiclo)}</span></li>}
-                                <li><span>Cargos de este estado</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>
+                                {t.estado.concilCiclo > 0.005 && (() => { const tj = data.tarjetas.find((x) => x.id === t.id); return <li><span>Saldo según tu banco al {formatFechaCorta(parseISODate(tj.conciliacion.fecha))}</span><span>{formatQ(t.estado.concilCiclo)}</span></li>; })()}
+                                {(t.estado.comprasCiclo + t.estado.ajustesCiclo > 0.005 || t.estado.concilCiclo <= 0.005) && <li><span>{t.estado.concilCiclo > 0.005 ? 'Compras nuevas' : 'Cargos de este estado'}</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>}
                                 {t.estado.pagosDelCiclo > 0.005 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.estado.pagosDelCiclo)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
                               {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">✓ Estado de cuenta pagado</p>}
-                              <button className="abono-link" onClick={() => { setAjusteSaldoDraft(String(t.total)); setAjusteSaldoFormId(t.id); }}>
+                              <button className="abono-link" onClick={() => { setAjusteSaldoDraft(''); setAjusteFechaDraft(hoyISO()); setAjusteSaldoFormId(t.id); }}>
                                 Ajustar saldo
                               </button>
                             </div>
@@ -3421,6 +3521,7 @@ function ControlGastos({ user, onIrALogin }) {
                                               </div>
                                               <div className="row-actions">
                                                 <span className="amount-mono negative">-{formatQ(c.montoCuota)}</span>
+                                                {botonPagada(e)}
                                               </div>
                                             </li>
                                           );
@@ -3454,6 +3555,7 @@ function ControlGastos({ user, onIrALogin }) {
                                               {editandoNombreGastoId !== g.id && (
                                               <div className="row-actions">
                                                 <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                                {botonPagada(e)}
                                                 <button className="icon-btn small" onClick={() => { setEditNombreGastoDraft(g.descripcion); setEditandoNombreGastoId(g.id); }} aria-label="Editar nombre"><Icon name="pencil" size={13} /></button>
                                                 {confirmingId === `unico-tarjeta__${g.id}` ? (
                                                   <span className="confirm-group">
@@ -3481,6 +3583,7 @@ function ControlGastos({ user, onIrALogin }) {
                                               </div>
                                               <div className="row-actions">
                                                 <span className="amount-mono negative">-{formatQ(e.monto)}</span>
+                                                {botonPagada(e)}
                                               </div>
                                             </li>
                                           );
@@ -3526,6 +3629,7 @@ function ControlGastos({ user, onIrALogin }) {
                                               </div>
                                               <div className="row-actions">
                                                 <span className="amount-mono negative">-{formatQ(f.monto)}</span>
+                                                {botonPagada(e)}
                                               </div>
                                             </li>
                                           );
@@ -3565,6 +3669,7 @@ function ControlGastos({ user, onIrALogin }) {
                                             {editandoGastoTCId !== g.id && (
                                               <div className="row-actions">
                                                 <span className="amount-mono negative">-{formatQ(g.monto)}</span>
+                                                {botonPagada(e)}
                                                 <button className="icon-btn small" onClick={() => iniciarEdicionGastoTC(g)} aria-label="Editar monto"><Icon name="pencil" size={13} /></button>
                                                 {confirmingId === `tc__${g.id}` ? (
                                                   <span className="confirm-group">
@@ -3749,11 +3854,34 @@ function ControlGastos({ user, onIrALogin }) {
               </ul>
             </div>
           )}
-          {(data.ajustesTarjeta || []).length > 0 && (
+          {((data.ajustesTarjeta || []).length > 0 || data.tarjetas.some((t) => t.conciliacion)) && (
             <div className="card">
               <h2 className="section-title">Ajustes de saldo</h2>
-              <p className="section-sub">Correcciones hechas con "Ajustar saldo" para que la deuda cuadre con tu banco. Ya están incluidas en los cargos de cada mes.</p>
+              <p className="section-sub">Saldos que ajustaste con "Ajustar saldo". Desde esa fecha la app toma ese monto como lo que debes; lo anterior queda como pagado.</p>
               <ul className="ledger-list">
+                {data.tarjetas.filter((t) => t.conciliacion).map((t) => (
+                  <li key={`conc-${t.id}`} className="ledger-row">
+                    <div className="row-main">
+                      <span className="cat-badge tarjeta-badge"><Icon name="pencil" size={14} /></span>
+                      <div>
+                        <div className="row-desc">{t.nombre}</div>
+                        <p className="meta-detail">Saldo al {formatFechaCorta(parseISODate(t.conciliacion.fecha))}</p>
+                      </div>
+                    </div>
+                    <div className="row-actions">
+                      <span className="amount-mono">{formatQ(t.conciliacion.saldo)}</span>
+                      {confirmingId === `conc__${t.id}` ? (
+                        <span className="confirm-group">
+                          <span className="confirm-warning">¿Quitar ajuste?</span>
+                          <button className="btn-add danger small" onClick={() => { quitarConciliacion(t.id); setConfirmingId(null); }}>Sí, quitar</button>
+                          <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                        </span>
+                      ) : (
+                        <button className="icon-btn small danger" onClick={() => setConfirmingId(`conc__${t.id}`)} aria-label="Quitar ajuste de saldo"><Icon name="trash" size={14} /></button>
+                      )}
+                    </div>
+                  </li>
+                ))}
                 {[...(data.ajustesTarjeta || [])].sort((a, b) => (a.mes < b.mes ? 1 : -1)).map((a) => {
                   const t = data.tarjetas.find((x) => x.id === a.tarjetaId);
                   return (
@@ -3798,6 +3926,24 @@ function ControlGastos({ user, onIrALogin }) {
           <div className="card">
             <h2 className="section-title">Configuración</h2>
             <p className="section-sub">Ajustes generales de la app.</p>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-title">Marcar compras como pagadas</div>
+                <p className="meta-detail">Encendido: en Tarjetas aparece "Marcar pagada" en cada compra pendiente. Apagado: se ocultan esos botones (lo ya marcado se conserva).</p>
+              </div>
+              <button type="button" role="switch" aria-checked={!!(data.config && data.config.marcarPagadas)}
+                      className={`switch ${data.config && data.config.marcarPagadas ? 'on' : ''}`}
+                      onClick={() => setMarcarPagadas(!(data.config && data.config.marcarPagadas))}>
+                <span className="switch-knob" />
+              </button>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-title">Exportar mis datos</div>
+                <p className="meta-detail">Descarga un archivo con todos tus registros (para respaldo o para revisar un cálculo).</p>
+              </div>
+              <button className="btn-add small" onClick={exportarDatos}>Exportar</button>
+            </div>
             <div className="settings-row">
               <div>
                 <div className="settings-row-title">Borrar todos los datos</div>
@@ -4028,6 +4174,11 @@ const STYLES = `
 .check-externo { display:flex; align-items:flex-start; gap:8px; margin-top:8px; font-size:11.5px; color:var(--text-secondary); cursor:pointer; line-height:1.4; }
 .check-externo input { margin-top:2px; accent-color:var(--accent); }
 .check-externo em { font-style:normal; opacity:0.75; }
+.switch { position:relative; width:46px; height:26px; border-radius:13px; border:none; background:rgba(255,255,255,0.16); cursor:pointer; flex-shrink:0; transition:background 0.15s; padding:0; }
+.switch.on { background:var(--positive); }
+.switch-knob { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left 0.15s; }
+.switch.on .switch-knob { left:23px; }
+.switch:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .link-toggle { background:none; border:1px solid var(--border-strong); color:var(--text-secondary); border-radius:8px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; font-family:'Inter', sans-serif; }
 .link-toggle:hover { color:var(--text); }
 .link-mini { background:none; border:none; color:var(--accent); font-size:11px; text-decoration:underline; cursor:pointer; padding:0 0 0 6px; font-family:'Inter', sans-serif; }

@@ -2162,6 +2162,45 @@ function primerNombreAuto(user) {
   return base ? base.charAt(0).toUpperCase() + base.slice(1).toLowerCase() : '';
 }
 
+// Doble confirmación: 1) "¿Seguro?"  2) escribir un código aleatorio de 4 dígitos.
+function codigoAleatorio() {
+  const n = (window.crypto && crypto.getRandomValues) ? crypto.getRandomValues(new Uint32Array(1))[0] % 9000 : Math.floor(Math.random() * 9000);
+  return String(1000 + n);
+}
+function DobleConfirmacion({ pregunta, detalle, textoBoton, onConfirmar, onCancelar }) {
+  const [paso, setPaso] = useState(1);
+  const [codigo] = useState(codigoAleatorio);
+  const [escrito, setEscrito] = useState('');
+  const ok = escrito.trim() === codigo;
+  return (
+    <div className="doble-confirm">
+      {paso === 1 ? (
+        <>
+          <p className="doble-confirm-pregunta">{pregunta}</p>
+          {detalle && <p className="meta-detail" style={{ marginTop: 2 }}>{detalle}</p>}
+          <div className="doble-confirm-botones">
+            <button className="btn-add danger small" onClick={() => setPaso(2)}>Sí, continuar</button>
+            <button className="btn-sec" onClick={onCancelar}>Cancelar</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="doble-confirm-pregunta">Para confirmar, escribe este código: <span className="doble-confirm-codigo">{codigo}</span></p>
+          <div className="doble-confirm-botones">
+            <input className="field" inputMode="numeric" maxLength={4} autoFocus placeholder="Código" value={escrito}
+                   onChange={(e) => setEscrito(e.target.value.replace(/\D/g, ''))}
+                   onKeyDown={(e) => { if (e.key === 'Enter' && ok) onConfirmar(); if (e.key === 'Escape') onCancelar(); }}
+                   style={{ maxWidth: 110 }} />
+            <button className="btn-add danger small" disabled={!ok} onClick={onConfirmar}>{textoBoton}</button>
+            <button className="btn-sec" onClick={onCancelar}>Cancelar</button>
+          </div>
+          {escrito.length === 4 && !ok && <p className="hint" style={{ color: 'var(--negative)', marginTop: 6 }}>El código no coincide.</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ============================== APP PRINCIPAL ============================== */
 function ControlGastos({ user, onIrALogin }) {
   const [data, setData] = useState({ ingresos: {}, gastos: [], cuotas: [], gastosFijos: [], metas: [], tarjetas: [], gastosTC: [], pagosTarjeta: [], ajustesTarjeta: [], tipoCambio: TIPO_CAMBIO_DEFAULT });
@@ -2253,7 +2292,6 @@ function ControlGastos({ user, onIrALogin }) {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(76);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
-  const [diagAppCheck, setDiagAppCheck] = useState(''); // TEMPORAL: diagnóstico de App Check
   const [nombreDraft, setNombreDraft] = useState('');
   const [nombreMsg, setNombreMsg] = useState('');
   const [exportForm, setExportForm] = useState(false);
@@ -2376,19 +2414,6 @@ function ControlGastos({ user, onIrALogin }) {
     escribirLS(nombreGuardadoKey(user), nombreBienvenida || null);
     setNombreDraft(nombreBienvenida);
   }, [loaded, nombreBienvenida]);
-  // TEMPORAL: pide un pase de App Check y muestra si funcionó o el error exacto. Se quita al resolver App Check.
-  async function probarAppCheck() {
-    setDiagAppCheck('Probando…');
-    try {
-      if (!firebase.appCheck || !RECAPTCHA_SITE_KEY) { setDiagAppCheck('App Check no está activado en el código.'); return; }
-      const r = await firebase.appCheck().getToken(true);
-      if (r && r.error) setDiagAppCheck('❌ ' + ((r.error.code || '') + ' ' + (r.error.message || String(r.error))).trim());
-      else if (r && r.token) setDiagAppCheck('✅ Verificación correcta. Google entregó el pase de seguridad.');
-      else setDiagAppCheck('❌ No se recibió pase.');
-    } catch (e) {
-      setDiagAppCheck('❌ ' + (((e && e.code) || '') + ' ' + (e && e.message ? e.message : String(e))).trim());
-    }
-  }
   function guardarNombreBienvenida() {
     const limpio = nombreDraft.replace(/\s+/g, ' ').trim().slice(0, 30);
     setData((prev) => ({ ...prev, config: { ...(prev.config || {}), nombreBienvenida: limpio } }));
@@ -4547,24 +4572,36 @@ function ControlGastos({ user, onIrALogin }) {
                     <div className="settings-row-title">Respaldos automáticos</div>
                     <p className="meta-detail">Cada {RESPALDO_DIAS} días se guarda una copia de tus datos en tu cuenta. Se conservan los últimos {RESPALDOS_A_GUARDAR}.</p>
                   </div>
-                  <button className="btn-add small" onClick={respaldoManual}>Respaldar ahora</button>
+                  <button className="btn-add small" onClick={() => setConfirmingId('respaldo__nuevo')}>Respaldar ahora</button>
                 </div>
+                {confirmingId === 'respaldo__nuevo' && (
+                  <DobleConfirmacion
+                    pregunta="¿Crear un respaldo ahora?"
+                    detalle={`Si ya existe uno de hoy, se reemplaza. Se conservan solo los últimos ${RESPALDOS_A_GUARDAR}.`}
+                    textoBoton="Respaldar"
+                    onConfirmar={() => { setConfirmingId(null); respaldoManual(); }}
+                    onCancelar={() => setConfirmingId(null)} />
+                )}
                 {respaldos.length > 0 && (
                   <ul className="ledger-list" style={{ marginTop: 6 }}>
                     {respaldos.map((r) => (
-                      <li key={r.id} className="ledger-row">
+                      <li key={r.id} className="ledger-row" style={{ flexWrap: 'wrap' }}>
                         <div className="row-desc">{formatFechaCorta(parseISODate(r.fecha))}</div>
                         <div className="row-actions">
-                          {confirmingId === `resp__${r.id}` ? (
-                            <span className="confirm-group">
-                              <span className="confirm-warning">¿Volver a este respaldo? Reemplaza tus datos actuales.</span>
-                              <button className="btn-add danger small" onClick={() => restaurarRespaldo(r)}>Sí, restaurar</button>
-                              <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
-                            </span>
-                          ) : (
+                          {confirmingId !== `resp__${r.id}` && (
                             <button className="link-toggle" onClick={() => setConfirmingId(`resp__${r.id}`)}>Restaurar</button>
                           )}
                         </div>
+                        {confirmingId === `resp__${r.id}` && (
+                          <div style={{ width: '100%' }}>
+                            <DobleConfirmacion
+                              pregunta={`¿Volver al respaldo del ${formatFechaCorta(parseISODate(r.fecha))}?`}
+                              detalle="Tus datos actuales se reemplazan por los de ese día. Lo que registraste después se pierde."
+                              textoBoton="Restaurar"
+                              onConfirmar={() => restaurarRespaldo(r)}
+                              onCancelar={() => setConfirmingId(null)} />
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -4572,17 +4609,6 @@ function ControlGastos({ user, onIrALogin }) {
                 {respaldoMsg && <p className="hint" style={{ marginTop: 8 }}>{respaldoMsg}</p>}
               </div>
             )}
-            {/* TEMPORAL: diagnóstico de App Check */}
-            <div className="settings-row settings-col">
-              <div className="settings-row-top">
-                <div>
-                  <div className="settings-row-title">Probar verificación de seguridad</div>
-                  <p className="meta-detail">Revisa si la protección contra bots (App Check) funciona en este dispositivo.</p>
-                </div>
-                <button className="btn-add small" onClick={probarAppCheck}>Probar</button>
-              </div>
-              {diagAppCheck && <p className="hint" style={{ marginTop: 8, wordBreak: 'break-word', userSelect: 'text' }}>{diagAppCheck}</p>}
-            </div>
             <div className="settings-row">
               <div>
                 <div className="settings-row-title">Borrar todos los datos</div>
@@ -4930,6 +4956,10 @@ const STYLES = `
 .tab-bar-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .link-btn { background:none; border:none; color:var(--text-secondary); font-size:12px; text-decoration:underline; cursor:pointer; }
 .link-btn:hover { color:var(--silver); }
+.doble-confirm { margin-top:10px; padding:12px; border:1px solid rgba(255,69,58,0.35); border-radius:12px; background:rgba(255,69,58,0.06); }
+.doble-confirm-pregunta { font-size:13px; color:var(--text); margin:0; }
+.doble-confirm-codigo { font-weight:800; font-size:16px; letter-spacing:3px; color:var(--negative); margin-left:4px; user-select:none; -webkit-user-select:none; }
+.doble-confirm-botones { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
 .privacidad-nota { font-size:11px; line-height:1.55; color:var(--text-secondary); text-align:justify; text-align-last:left; hyphens:auto; -webkit-hyphens:auto; margin:22px 0 0; opacity:0.85; }
 .reset-confirm { display:flex; align-items:center; justify-content:center; gap:10px; font-size:12.5px; color:var(--negative); flex-wrap:wrap; }
 

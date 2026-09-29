@@ -2253,6 +2253,7 @@ function ControlGastos({ user, onIrALogin }) {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(76);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
+  const [diagAppCheck, setDiagAppCheck] = useState(''); // TEMPORAL: diagnóstico de App Check
   const [nombreDraft, setNombreDraft] = useState('');
   const [nombreMsg, setNombreMsg] = useState('');
   const [exportForm, setExportForm] = useState(false);
@@ -2375,6 +2376,19 @@ function ControlGastos({ user, onIrALogin }) {
     escribirLS(nombreGuardadoKey(user), nombreBienvenida || null);
     setNombreDraft(nombreBienvenida);
   }, [loaded, nombreBienvenida]);
+  // TEMPORAL: pide un pase de App Check y muestra si funcionó o el error exacto. Se quita al resolver App Check.
+  async function probarAppCheck() {
+    setDiagAppCheck('Probando…');
+    try {
+      if (!firebase.appCheck || !RECAPTCHA_SITE_KEY) { setDiagAppCheck('App Check no está activado en el código.'); return; }
+      const r = await firebase.appCheck().getToken(true);
+      if (r && r.error) setDiagAppCheck('❌ ' + ((r.error.code || '') + ' ' + (r.error.message || String(r.error))).trim());
+      else if (r && r.token) setDiagAppCheck('✅ Verificación correcta. Google entregó el pase de seguridad.');
+      else setDiagAppCheck('❌ No se recibió pase.');
+    } catch (e) {
+      setDiagAppCheck('❌ ' + (((e && e.code) || '') + ' ' + (e && e.message ? e.message : String(e))).trim());
+    }
+  }
   function guardarNombreBienvenida() {
     const limpio = nombreDraft.replace(/\s+/g, ' ').trim().slice(0, 30);
     setData((prev) => ({ ...prev, config: { ...(prev.config || {}), nombreBienvenida: limpio } }));
@@ -4558,6 +4572,17 @@ function ControlGastos({ user, onIrALogin }) {
                 {respaldoMsg && <p className="hint" style={{ marginTop: 8 }}>{respaldoMsg}</p>}
               </div>
             )}
+            {/* TEMPORAL: diagnóstico de App Check */}
+            <div className="settings-row settings-col">
+              <div className="settings-row-top">
+                <div>
+                  <div className="settings-row-title">Probar verificación de seguridad</div>
+                  <p className="meta-detail">Revisa si la protección contra bots (App Check) funciona en este dispositivo.</p>
+                </div>
+                <button className="btn-add small" onClick={probarAppCheck}>Probar</button>
+              </div>
+              {diagAppCheck && <p className="hint" style={{ marginTop: 8, wordBreak: 'break-word', userSelect: 'text' }}>{diagAppCheck}</p>}
+            </div>
             <div className="settings-row">
               <div>
                 <div className="settings-row-title">Borrar todos los datos</div>

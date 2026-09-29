@@ -588,14 +588,19 @@ function getEstadoTarjetaSaldo(tarjeta, data, mes) {
   const pagadoCiclo = redondear(pagos.filter((p) => p.fechaISO >= inicioMes).reduce((a, p) => a + p.monto, 0));
   const neto = saldoAnterior + totalCiclo - pagadoCiclo;
   const deudaAnterior = Math.max(saldoAnterior, 0);
+  // Los pagos registrados con fecha POSTERIOR (ej. un pago del 1 de octubre visto desde septiembre)
+  // primero liquidan lo que quedó debiendo este mes, igual que en el banco (el pago cubre la deuda más antigua).
+  const pagosPosteriores = redondear(getPagosDeTarjeta(tarjeta, data).filter((p) => p.fechaISO > limite).reduce((a, p) => a + p.monto, 0));
+  const saldoCierre = Math.max(redondear(neto), 0);
+  const cubiertoDespues = redondear(Math.min(saldoCierre, pagosPosteriores));
   return {
-    modo: 'saldo', fechaSaldo: parseISODate(limite),
+    modo: 'saldo', fechaSaldo: parseISODate(limite), saldoCierre, cubiertoDespues,
     fechaPago: primeraFechaPagoDespues(tarjeta, limite < hoy ? limite : hoy), fechaCorte: fechaCorteDeMes(tarjeta, mes),
     saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo, inicialCiclo, concilCiclo,
     pendienteAnterior: Math.max(deudaAnterior - pagadoCiclo, 0),
     favorAnterior: Math.max(-saldoAnterior, 0),
     pagosDelCiclo: Math.max(pagadoCiclo - deudaAnterior, 0),
-    pendiente: Math.max(redondear(neto), 0),
+    pendiente: redondear(saldoCierre - cubiertoDespues),
     aFavor: Math.max(redondear(-neto), 0),
     cargosCiclo,
   };
@@ -3456,7 +3461,11 @@ function ControlGastos({ user, onIrALogin }) {
                             <div className="row-desc">{t.nombre}</div>
                             <p className="meta-detail">
                               {resumen.estado.modo === 'saldo'
-                                ? (totalMesActual > 0.005 ? `Saldo al ${formatFechaCorta(resumen.estado.fechaSaldo)}: ${formatQ(totalMesActual)}` : `Sin saldo pendiente ✓`)
+                                ? (totalMesActual > 0.005
+                                    ? `Saldo al ${formatFechaCorta(resumen.estado.fechaSaldo)}: ${formatQ(totalMesActual)}${resumen.estado.cubiertoDespues > 0.005 ? ` (ya abonaste ${formatQ(resumen.estado.cubiertoDespues)} después)` : ''}`
+                                    : resumen.estado.cubiertoDespues > 0.005
+                                    ? `Saldo al ${formatFechaCorta(resumen.estado.fechaSaldo)} (${formatQ(resumen.estado.saldoCierre)}) pagado después ✓`
+                                    : `Sin saldo pendiente ✓`)
                                 : totalMesActual > 0.005
                                 ? `Por pagar el ${formatFechaCorta(resumen.estado.fechaPago)}: ${formatQ(totalMesActual)}`
                                 : `Nada pendiente para el ${formatFechaCorta(resumen.estado.fechaPago)} ✓`}

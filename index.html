@@ -40,9 +40,10 @@
   // 2) APP CHECK (reCAPTCHA v3, invisible): pega aquí la CLAVE DE SITIO.
   //    Mientras esté vacía, App Check queda apagado y la app funciona igual.
   // =====================================================================
-  var RECAPTCHA_SITE_KEY = '';
+  var RECAPTCHA_SITE_KEY = '6Lc6FNUtAAAAAHud4vk2zaIqNvbN7PB5iz2Wsd_k';
   if (RECAPTCHA_SITE_KEY && firebase.appCheck) {
-    try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY), true); }
+    // Registrada en Firebase como Fraud Defense (antes reCAPTCHA Enterprise).
+    try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY), true); }
     catch (e) { console.error('App Check no se pudo activar', e); }
   }
   var auth = firebase.auth();

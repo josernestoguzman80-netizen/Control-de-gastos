@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- Política de contenido: solo se puede cargar código y conectarse a estos sitios (Firebase, Google y el CDN de librerías). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://apis.google.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net; connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.firebaseapp.com https://www.gstatic.com; frame-src https://control-de-gastos-mensuales.firebaseapp.com https://www.google.com https://recaptcha.google.com https://www.recaptcha.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <title>CoinPocket</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='6' y='14' width='36' height='28' rx='8' fill='%230A84FF'/%3E%3Cpath d='M10 20 H38' stroke='%230868C9' stroke-width='2' stroke-linecap='round' opacity='0.55'/%3E%3Ccircle cx='34' cy='12' r='10' fill='%23E0B25C' stroke='%23C79A46' stroke-width='1.5'/%3E%3Ccircle cx='34' cy='12' r='5' fill='none' stroke='%23C79A46' stroke-width='1.4'/%3E%3C/svg%3E" />
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
@@ -15,6 +17,7 @@
 <script src="https://cdn.jsdelivr.net/npm/firebase@12.15.0/firebase-app-compat.js" integrity="sha384-J6/i9DnWkWsyWwWJNVKfJNA+7Erlaznpv7qbt2lfqjnYt5xUjG6gjQEvByiLR53j" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@12.15.0/firebase-auth-compat.js" integrity="sha384-WCMvq+IYULWMFMeYO/fKLTgpCgLaOUxgQc1dFPdo6uk9tv7Cq3ZKwFEvTteutP1M" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@12.15.0/firebase-firestore-compat.js" integrity="sha384-d8pcTwIXxLlzBmBTgziO/hoPmJ6tO6j7Z+ZJ4rBWfhBJh51Io3qwudexDJkAT+uW" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@12.15.0/firebase-app-check-compat.js" integrity="sha384-qx6DbthF/gGXY6ruLn/FYIpGgGjjSqhrPsUnLXaYnZwCayaNC6lhxUGIUPFRspnh" crossorigin="anonymous"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -33,6 +36,15 @@
     appId: "1:1022079752338:web:522de83b0fc8d4394cee4b"
   };
   firebase.initializeApp(firebaseConfig);
+  // =====================================================================
+  // 2) APP CHECK (reCAPTCHA v3, invisible): pega aquí la CLAVE DE SITIO.
+  //    Mientras esté vacía, App Check queda apagado y la app funciona igual.
+  // =====================================================================
+  var RECAPTCHA_SITE_KEY = '';
+  if (RECAPTCHA_SITE_KEY && firebase.appCheck) {
+    try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY), true); }
+    catch (e) { console.error('App Check no se pudo activar', e); }
+  }
   var auth = firebase.auth();
   var db = firebase.firestore();
 </script>
@@ -154,6 +166,28 @@ function problemasContrasena(p) {
   if (!/[0-9]/.test(p || '')) f.push('un número');
   return f;
 }
+// ---- Cifrado de exportaciones (AES-GCM 256 con clave derivada de tu contraseña, PBKDF2 310,000 iteraciones) ----
+function aB64(buf) { let t = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(t); }
+function deB64(str) { const t = atob(str); const b = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) b[i] = t.charCodeAt(i); return b; }
+async function derivarClave(pass, salt, iteraciones) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iteraciones, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function cifrarTexto(texto, pass) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)); const iv = crypto.getRandomValues(new Uint8Array(12)); const it = 310000;
+  const k = await derivarClave(pass, salt, it);
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(texto));
+  return JSON.stringify({ app: 'CoinPocket', formato: 'cifrado-v1', kdf: 'PBKDF2-SHA256', iteraciones: it, salt: aB64(salt), iv: aB64(iv), datos: aB64(ct) });
+}
+async function descifrarTexto(contenido, pass) {
+  const o = JSON.parse(contenido);
+  if (o.formato !== 'cifrado-v1') { if (o.app === 'CoinPocket' && o.datos) return contenido; throw new Error('formato'); }
+  const k = await derivarClave(pass, deB64(o.salt), o.iteraciones || 310000);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64(o.iv) }, k, deB64(o.datos));
+  return new TextDecoder().decode(pt);
+}
+const RESPALDO_DIAS = 7;
+const RESPALDOS_A_GUARDAR = 4;
 // JSON con llaves ordenadas: para comparar datos sin importar el orden en que Firestore devuelve los campos.
 function jsonEstable(v) {
   if (Array.isArray(v)) return '[' + v.map(jsonEstable).join(',') + ']';
@@ -2059,6 +2093,11 @@ function AuthScreen({ onVolver }) {
                 onClick={() => { setModo(modo === 'login' ? 'signup' : 'login'); setError(''); setInfo(''); }}>
           {modo === 'login' ? '¿No tienes cuenta? Créala aquí' : '¿Ya tienes cuenta? Inicia sesión'}
         </button>
+        <p className="privacidad-nota">
+          🔒 Tus datos se guardan en Firebase (Google), cifrados al viajar y al almacenarse. Solo tu cuenta puede verlos desde la app.
+          El administrador técnico de CoinPocket tiene acceso a la base de datos para mantenimiento y seguridad.
+          No guardamos números de tarjeta, CVV ni PIN.
+        </p>
         {onVolver && (
           <button className="link-btn" style={{ marginTop: 10, textAlign: 'center', width: '100%' }} onClick={onVolver}>
             Seguir sin cuenta
@@ -2198,6 +2237,17 @@ function ControlGastos({ user, onIrALogin }) {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(76);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
+  const [exportForm, setExportForm] = useState(false);
+  const [exportPass, setExportPass] = useState('');
+  const [exportPass2, setExportPass2] = useState('');
+  const [exportMsg, setExportMsg] = useState('');
+  const [importArchivo, setImportArchivo] = useState(null);
+  const [importPass, setImportPass] = useState('');
+  const [importMsg, setImportMsg] = useState('');
+  const [importListo, setImportListo] = useState(null);
+  const [respaldos, setRespaldos] = useState([]);
+  const [respaldoMsg, setRespaldoMsg] = useState('');
+  const dataRef = useRef(null);
 
   // Último estado que sabemos que está en Firestore, por campo (para guardar solo lo que cambió).
   const sincronizadoRef = useRef({});
@@ -2298,6 +2348,53 @@ function ControlGastos({ user, onIrALogin }) {
       }
     })();
   }, [data, loaded, user.uid]);
+
+  useEffect(() => { dataRef.current = data; }, [data]);
+  // Respaldo automático: al abrir la app, si el último tiene más de 7 días, guarda una copia (se conservan 4).
+  function coleccionRespaldos() { return db.collection(STORAGE_KEY).doc(user.uid).collection('respaldos'); }
+  async function cargarRespaldos() {
+    const snap = await coleccionRespaldos().orderBy('creado', 'desc').get();
+    const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    setRespaldos(lista);
+    return lista;
+  }
+  async function crearRespaldo(lista) {
+    const d = dataRef.current;
+    if (!d) return;
+    await coleccionRespaldos().doc(hoyISO()).set({ creado: Date.now(), fecha: hoyISO(), datos: JSON.stringify(d) });
+    const nueva = await cargarRespaldos();
+    const sobran = nueva.slice(RESPALDOS_A_GUARDAR);
+    for (const r of sobran) await coleccionRespaldos().doc(r.id).delete();
+    if (sobran.length) await cargarRespaldos();
+  }
+  useEffect(() => {
+    if (!loaded || user.local) return;
+    const t = setTimeout(async () => {
+      try {
+        const lista = await cargarRespaldos();
+        const d = dataRef.current || {};
+        const tieneDatos = ['gastos', 'tarjetas', 'gastosTC', 'gastosFijos', 'cuotas', 'metas', 'pagosTarjeta'].some((k) => (d[k] || []).length > 0);
+        if (tieneDatos && (!lista.length || Date.now() - (lista[0].creado || 0) > RESPALDO_DIAS * 86400000)) await crearRespaldo(lista);
+        setRespaldoMsg('');
+      } catch (e) {
+        console.error('Respaldo', e);
+        setRespaldoMsg(e && e.code === 'permission-denied' ? 'Para activar los respaldos, actualiza las reglas de Firestore (te las dio el asistente de configuración).' : 'No se pudieron revisar los respaldos. Intenta más tarde.');
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [loaded, user.uid]);
+  async function respaldoManual() {
+    setRespaldoMsg('Guardando…');
+    try { await crearRespaldo(); setRespaldoMsg('Respaldo guardado ✓'); }
+    catch (e) { setRespaldoMsg(e && e.code === 'permission-denied' ? 'Actualiza las reglas de Firestore para activar los respaldos.' : 'No se pudo guardar el respaldo.'); }
+  }
+  function restaurarRespaldo(r) {
+    try {
+      setData(normalizarDatos(JSON.parse(r.datos)));
+      setConfirmingId(null);
+      setRespaldoMsg(`Restauraste el respaldo del ${formatFechaCorta(parseISODate(r.fecha))} ✓`);
+    } catch (e) { setRespaldoMsg('Ese respaldo está dañado y no se pudo restaurar.'); }
+  }
 
   useEffect(() => { setMesInicioCuota(currentMonth); setMesInicioFijo(currentMonth); }, [currentMonth]);
   useEffect(() => {
@@ -2769,21 +2866,46 @@ function ControlGastos({ user, onIrALogin }) {
     if (e.pagado >= e.monto - 0.009) return null; // ya está cubierta por tus pagos
     return <button className="link-toggle" onClick={() => togglePagadaManual(e.key)}>Marcar pagada</button>;
   }
-  function exportarDatos() {
+  async function exportarDatos() {
+    setExportMsg('');
+    if (exportPass.length < 8) { setExportMsg('La contraseña del archivo debe tener al menos 8 caracteres.'); return; }
+    if (exportPass !== exportPass2) { setExportMsg('Las contraseñas no coinciden.'); return; }
     try {
-      const contenido = JSON.stringify({ app: 'CoinPocket', exportado: new Date().toISOString(), datos: data }, null, 2);
+      const contenido = await cifrarTexto(JSON.stringify({ app: 'CoinPocket', exportado: new Date().toISOString(), datos: data }), exportPass);
       const blob = new Blob([contenido], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `coinpocket-datos-${hoyISO()}.json`;
+      a.download = `coinpocket-datos-${hoyISO()}.cifrado.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportPass(''); setExportPass2(''); setExportForm(false);
+      setExportMsg('Archivo descargado ✓. Guarda la contraseña: sin ella nadie (ni tú) puede abrirlo.');
     } catch (e) {
       console.error('No se pudo exportar', e);
+      setExportMsg('No se pudo exportar. Intenta de nuevo.');
     }
+  }
+  async function leerImportacion() {
+    setImportMsg(''); setImportListo(null);
+    if (!importArchivo) { setImportMsg('Elige el archivo primero.'); return; }
+    try {
+      const texto = await importArchivo.text();
+      const plano = await descifrarTexto(texto, importPass);
+      const obj = JSON.parse(plano);
+      if (!obj || obj.app !== 'CoinPocket' || !obj.datos) throw new Error('formato');
+      setImportListo({ datos: normalizarDatos(obj.datos), fecha: obj.exportado });
+    } catch (e) {
+      setImportMsg(e && e.message === 'formato' ? 'Ese archivo no es un respaldo de CoinPocket.' : 'Contraseña incorrecta o archivo dañado.');
+    }
+  }
+  function confirmarImportacion() {
+    if (!importListo) return;
+    setData(importListo.datos);
+    setImportListo(null); setImportArchivo(null); setImportPass('');
+    setImportMsg('Datos restaurados desde el archivo ✓');
   }
   function confirmResetAll() {
     setData({ ingresos: {}, gastos: [], cuotas: [], gastosFijos: [], metas: [], tarjetas: [], gastosTC: [], pagosTarjeta: [], ajustesTarjeta: [], tipoCambio: TIPO_CAMBIO_DEFAULT, pagadasManual: {}, config: {} });
@@ -4309,13 +4431,81 @@ function ControlGastos({ user, onIrALogin }) {
                 <span className="switch-knob" />
               </button>
             </div>
-            <div className="settings-row">
-              <div>
-                <div className="settings-row-title">Exportar mis datos</div>
-                <p className="meta-detail">Descarga un archivo con todos tus registros (para respaldo o para revisar un cálculo).</p>
+            <div className="settings-row settings-col">
+              <div className="settings-row-top">
+                <div>
+                  <div className="settings-row-title">Exportar mis datos</div>
+                  <p className="meta-detail">Descarga un archivo protegido con contraseña con todos tus registros.</p>
+                </div>
+                {!exportForm && <button className="btn-add small" onClick={() => { setExportForm(true); setExportMsg(''); }}>Exportar</button>}
               </div>
-              <button className="btn-add small" onClick={exportarDatos}>Exportar</button>
+              {exportForm && (
+                <div className="form-grid" style={{ marginTop: 10 }}>
+                  <input className="field" type="password" placeholder="Contraseña para el archivo (8+ caracteres)" value={exportPass} onChange={(e) => setExportPass(e.target.value)} autoComplete="new-password" />
+                  <input className="field" type="password" placeholder="Repite la contraseña" value={exportPass2} onChange={(e) => setExportPass2(e.target.value)} autoComplete="new-password" />
+                  <div className="monto-row">
+                    <button className="btn-add" style={{ flex: 1 }} onClick={exportarDatos}><Icon name="check" size={15} /> Descargar archivo</button>
+                    <button className="icon-btn" onClick={() => { setExportForm(false); setExportPass(''); setExportPass2(''); }} aria-label="Cancelar"><Icon name="x" size={16} /></button>
+                  </div>
+                </div>
+              )}
+              {exportMsg && <p className="hint" style={{ marginTop: 8 }}>{exportMsg}</p>}
             </div>
+            <div className="settings-row settings-col">
+              <div>
+                <div className="settings-row-title">Importar un archivo exportado</div>
+                <p className="meta-detail">Recupera tus datos desde un archivo de "Exportar". Reemplaza lo que tienes ahora.</p>
+              </div>
+              <div className="form-grid" style={{ marginTop: 10 }}>
+                <input className="field" type="file" accept=".json,application/json" onChange={(e) => { setImportArchivo(e.target.files && e.target.files[0]); setImportListo(null); setImportMsg(''); }} />
+                {importArchivo && (
+                  <div className="monto-row">
+                    <input className="field" type="password" placeholder="Contraseña del archivo" value={importPass} onChange={(e) => setImportPass(e.target.value)} />
+                    <button className="btn-add small" onClick={leerImportacion}>Abrir</button>
+                  </div>
+                )}
+                {importListo && (
+                  <span className="confirm-group" style={{ justifyContent: 'flex-start' }}>
+                    <span className="confirm-warning">¿Reemplazar tus datos actuales con este archivo{importListo.fecha ? ` (${formatFechaCorta(new Date(importListo.fecha))})` : ''}? No se puede deshacer.</span>
+                    <button className="btn-add danger small" onClick={confirmarImportacion}>Sí, reemplazar</button>
+                    <button className="icon-btn small" onClick={() => setImportListo(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                  </span>
+                )}
+                {importMsg && <p className="hint">{importMsg}</p>}
+              </div>
+            </div>
+            {!user.local && (
+              <div className="settings-row settings-col">
+                <div className="settings-row-top">
+                  <div>
+                    <div className="settings-row-title">Respaldos automáticos</div>
+                    <p className="meta-detail">Cada {RESPALDO_DIAS} días se guarda una copia de tus datos en tu cuenta. Se conservan los últimos {RESPALDOS_A_GUARDAR}.</p>
+                  </div>
+                  <button className="btn-add small" onClick={respaldoManual}>Respaldar ahora</button>
+                </div>
+                {respaldos.length > 0 && (
+                  <ul className="ledger-list" style={{ marginTop: 6 }}>
+                    {respaldos.map((r) => (
+                      <li key={r.id} className="ledger-row">
+                        <div className="row-desc">{formatFechaCorta(parseISODate(r.fecha))}</div>
+                        <div className="row-actions">
+                          {confirmingId === `resp__${r.id}` ? (
+                            <span className="confirm-group">
+                              <span className="confirm-warning">¿Volver a este respaldo? Reemplaza tus datos actuales.</span>
+                              <button className="btn-add danger small" onClick={() => restaurarRespaldo(r)}>Sí, restaurar</button>
+                              <button className="icon-btn small" onClick={() => setConfirmingId(null)} aria-label="Cancelar"><Icon name="x" size={14} /></button>
+                            </span>
+                          ) : (
+                            <button className="link-toggle" onClick={() => setConfirmingId(`resp__${r.id}`)}>Restaurar</button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {respaldoMsg && <p className="hint" style={{ marginTop: 8 }}>{respaldoMsg}</p>}
+              </div>
+            )}
             <div className="settings-row">
               <div>
                 <div className="settings-row-title">Borrar todos los datos</div>
@@ -4640,6 +4830,8 @@ const STYLES = `
 .faq-body { padding:0 0 12px; }
 .faq-body p { font-size:12.5px; color:var(--text-secondary); line-height:1.55; margin:0 0 8px; }
 .settings-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-top:1px solid var(--border); }
+.settings-row.settings-col { flex-direction:column; align-items:stretch; }
+.settings-row-top { display:flex; align-items:center; justify-content:space-between; gap:14px; }
 .settings-row-title { font-size:14px; color:var(--text); font-weight:600; }
 
 .tab-bar {
@@ -4661,6 +4853,7 @@ const STYLES = `
 .tab-bar-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .link-btn { background:none; border:none; color:var(--text-secondary); font-size:12px; text-decoration:underline; cursor:pointer; }
 .link-btn:hover { color:var(--silver); }
+.privacidad-nota { font-size:11px; line-height:1.5; color:var(--text-secondary); text-align:center; margin:22px 0 0; opacity:0.85; }
 .reset-confirm { display:flex; align-items:center; justify-content:center; gap:10px; font-size:12.5px; color:var(--negative); flex-wrap:wrap; }
 
 /* ---------- Asistente ---------- */

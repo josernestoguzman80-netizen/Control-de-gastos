@@ -593,8 +593,17 @@ function getEstadoTarjetaSaldo(tarjeta, data, mes) {
   const pagosPosteriores = redondear(getPagosDeTarjeta(tarjeta, data).filter((p) => p.fechaISO > limite).reduce((a, p) => a + p.monto, 0));
   const saldoCierre = Math.max(redondear(neto), 0);
   const cubiertoDespues = redondear(Math.min(saldoCierre, pagosPosteriores));
+  // Cuadre con el historial "Compras de <mes>": total original de TODO el mes y qué parte no suma a la deuda.
+  const delMes = getCargosTarjeta(tarjeta, data, addMonths(mes, 3)).filter((c) => c.tipo !== 'ajuste' && c.fecha.slice(0, 7) === mes);
+  const original = (c) => (c.montoOriginal != null ? c.montoOriginal : c.monto);
+  const cuadre = {
+    totalMes: redondear(delMes.reduce((a, c) => a + original(c), 0)),
+    marcadasPagadas: redondear(delMes.filter((c) => c.pagadaManual).reduce((a, c) => a + original(c), 0)),
+    cubiertoAjuste: redondear(delMes.filter((c) => !c.pagadaManual).reduce((a, c) => a + (c.liquidado || 0), 0)),
+    despuesDeHoy: redondear(delMes.filter((c) => c.fecha > limite).reduce((a, c) => a + c.monto, 0)),
+  };
   return {
-    modo: 'saldo', fechaSaldo: parseISODate(limite), saldoCierre, cubiertoDespues,
+    modo: 'saldo', fechaSaldo: parseISODate(limite), saldoCierre, cubiertoDespues, cuadre,
     fechaPago: primeraFechaPagoDespues(tarjeta, limite < hoy ? limite : hoy), fechaCorte: fechaCorteDeMes(tarjeta, mes),
     saldoAnterior, totalCiclo, pagadoCiclo, ajustesCiclo, comprasCiclo, inicialCiclo, concilCiclo,
     pendienteAnterior: Math.max(deudaAnterior - pagadoCiclo, 0),
@@ -3327,12 +3336,26 @@ function ControlGastos({ user, onIrALogin }) {
                                 ? `Saldo al ${formatFechaCorta(t.estado.fechaSaldo)} · próximo pago ${formatFechaCorta(t.estado.fechaPago)}`
                                 : `Vence el ${formatFechaCorta(t.estado.fechaPago)}`}</p>
                               <ul className="desglose-tc">
-                                {t.estado.pendienteAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.pendienteAnterior)}</span></li>}
-                                {t.estado.favorAnterior > 0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(t.estado.favorAnterior)}</span></li>}
+                                {t.estado.modo === 'saldo' && t.estado.saldoAnterior > 0.005 && <li><span>Saldo al empezar el mes</span><span>{formatQ(t.estado.saldoAnterior)}</span></li>}
+                                {t.estado.modo === 'saldo' && t.estado.saldoAnterior < -0.005 && <li><span>Saldo a favor al empezar el mes</span><span className="positive">-{formatQ(-t.estado.saldoAnterior)}</span></li>}
+                                {t.estado.modo !== 'saldo' && t.estado.pendienteAnterior > 0.005 && <li><span>Pendiente de meses anteriores</span><span>{formatQ(t.estado.pendienteAnterior)}</span></li>}
+                                {t.estado.modo !== 'saldo' && t.estado.favorAnterior > 0.005 && <li><span>Saldo a favor anterior</span><span className="positive">-{formatQ(t.estado.favorAnterior)}</span></li>}
+                                {t.estado.modo === 'saldo' && t.estado.cuadre ? (<>
+                                  <li><span>Compras de {monthLabel(currentMonth)}</span><span>{formatQ(t.estado.cuadre.totalMes)}</span></li>
+                                  {t.estado.cuadre.marcadasPagadas > 0.005 && <li><span>Marcadas como pagadas</span><span className="positive">-{formatQ(t.estado.cuadre.marcadasPagadas)}</span></li>}
+                                  {t.estado.cuadre.cubiertoAjuste > 0.005 && <li><span>Ya incluidas en tu "Ajustar saldo"</span><span className="positive">-{formatQ(t.estado.cuadre.cubiertoAjuste)}</span></li>}
+                                  {t.estado.cuadre.despuesDeHoy > 0.005 && <li><span>Cargos después de hoy (aún no suman)</span><span className="positive">-{formatQ(t.estado.cuadre.despuesDeHoy)}</span></li>}
+                                  {Math.abs(t.estado.ajustesCiclo) > 0.005 && <li><span>Ajustes de saldo</span><span>{formatQ(t.estado.ajustesCiclo)}</span></li>}
+                                </>) : (<>
                                 {t.estado.inicialCiclo > 0.005 && <li><span>Saldo que ya debías</span><span>{formatQ(t.estado.inicialCiclo)}</span></li>}
                                 {t.estado.concilCiclo > 0.005 && (() => { const tj = data.tarjetas.find((x) => x.id === t.id); return <li><span>Saldo según tu banco al {formatFechaCorta(parseISODate(tj.conciliacion.fecha))}</span><span>{formatQ(t.estado.concilCiclo)}</span></li>; })()}
-                                {(t.estado.comprasCiclo + t.estado.ajustesCiclo > 0.005 || t.estado.concilCiclo <= 0.005) && <li><span>{t.estado.concilCiclo > 0.005 ? 'Compras nuevas' : t.estado.modo === 'saldo' ? 'Compras del mes' : 'Cargos de este estado'}</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>}
-                                {t.estado.pagosDelCiclo > 0.005 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.estado.pagosDelCiclo)}</span></li>}
+                                {(t.estado.comprasCiclo + t.estado.ajustesCiclo > 0.005 || t.estado.concilCiclo <= 0.005) && <li><span>{t.estado.concilCiclo > 0.005 ? 'Compras nuevas' : 'Cargos de este estado'}</span><span>{formatQ(t.estado.comprasCiclo + t.estado.ajustesCiclo)}</span></li>}
+                                </>)}
+                                {t.estado.modo === 'saldo'
+                                  ? t.estado.pagadoCiclo > 0.005 && <li><span>Pagos de {monthLabel(currentMonth)}</span><span className="positive">-{formatQ(t.estado.pagadoCiclo)}</span></li>
+                                  : t.estado.pagosDelCiclo > 0.005 && <li><span>Pagos registrados</span><span className="positive">-{formatQ(t.estado.pagosDelCiclo)}</span></li>}
+                                {t.estado.cubiertoDespues > 0.005 && <li><span>Pagado después del {formatFechaCorta(t.estado.fechaSaldo)}</span><span className="positive">-{formatQ(t.estado.cubiertoDespues)}</span></li>}
+                                {t.estado.modo === 'saldo' && <li className="desglose-total"><span>{t.estado.aFavor > 0.005 ? 'Saldo a favor' : 'Saldo de la tarjeta'}</span><span className={t.estado.pendiente > 0.005 ? '' : 'positive'}>{formatQ(t.estado.aFavor > 0.005 ? t.estado.aFavor : t.estado.pendiente)}</span></li>}
                               </ul>
                               {t.estado.aFavor > 0.005 && <p className="meta-detail positive">Tienes {formatQ(t.estado.aFavor)} a favor</p>}
                               {t.total <= 0.005 && (t.estado.totalCiclo > 0 || t.pagadoMes > 0) && <p className="meta-detail positive">{t.estado.modo === 'saldo' ? '✓ Sin saldo pendiente' : '✓ Estado de cuenta pagado'}</p>}
@@ -4254,6 +4277,7 @@ const STYLES = `
 .desglose-tc { list-style:none; margin:6px 0 0; padding:0; min-width:200px; }
 .desglose-tc li { display:flex; justify-content:space-between; gap:14px; font-size:11.5px; color:var(--text-secondary); padding:2px 0; }
 .desglose-tc li span:last-child { font-variant-numeric:tabular-nums; }
+.desglose-tc li.desglose-total { border-top:1px solid var(--border); margin-top:4px; padding-top:5px; color:var(--text); font-weight:700; }
 .progress-track { width:130px; height:5px; background:rgba(255,255,255,0.08); border-radius:4px; margin-top:6px; overflow:hidden; }
 .progress-fill { height:100%; background:var(--accent); border-radius:4px; transition: width 0.3s ease; }
 .row-actions { display:flex; align-items:center; gap:10px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }

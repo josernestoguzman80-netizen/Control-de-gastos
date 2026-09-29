@@ -2094,7 +2094,7 @@ function AuthScreen({ onVolver }) {
           {modo === 'login' ? '¿No tienes cuenta? Créala aquí' : '¿Ya tienes cuenta? Inicia sesión'}
         </button>
         <p className="privacidad-nota">
-          🔒 Tus datos se guardan en Firebase (Google), cifrados al viajar y al almacenarse. Solo tu cuenta puede verlos desde la app.
+          Tus datos se guardan en Firebase (Google), cifrados al viajar y al almacenarse. Solo tu cuenta puede verlos desde la app.
           El administrador técnico de CoinPocket tiene acceso a la base de datos para mantenimiento y seguridad.
           No guardamos números de tarjeta, CVV ni PIN.
         </p>
@@ -4853,7 +4853,7 @@ const STYLES = `
 .tab-bar-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .link-btn { background:none; border:none; color:var(--text-secondary); font-size:12px; text-decoration:underline; cursor:pointer; }
 .link-btn:hover { color:var(--silver); }
-.privacidad-nota { font-size:11px; line-height:1.5; color:var(--text-secondary); text-align:center; margin:22px 0 0; opacity:0.85; }
+.privacidad-nota { font-size:11px; line-height:1.55; color:var(--text-secondary); text-align:justify; text-align-last:left; hyphens:auto; -webkit-hyphens:auto; margin:22px 0 0; opacity:0.85; }
 .reset-confirm { display:flex; align-items:center; justify-content:center; gap:10px; font-size:12.5px; color:var(--negative); flex-wrap:wrap; }
 
 /* ---------- Asistente ---------- */

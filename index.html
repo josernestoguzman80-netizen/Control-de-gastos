@@ -648,6 +648,18 @@ function getEstadoTarjetaCorte(tarjeta, data, mes) {
     cargosCiclo,
   };
 }
+// Para el asistente: "¿cuánto pago?" siempre es lo que vence en la fecha de pago según el corte,
+// sin importar cómo se muestre la deuda en la pestaña Tarjetas.
+function getEstadoPago(tarjeta, data, mes) { return getEstadoTarjetaCorte(tarjeta, data, mes); }
+function getEntradasPagoMes(tarjeta, data, mes) {
+  const asignado = getAsignacionPagos(tarjeta, data, mes);
+  return getEstadoPago(tarjeta, data, mes).cargosCiclo
+    .filter((c) => c.tipo !== 'ajuste')
+    .map((c) => ({ tipo: c.tipo, dia: c.dia, item: c.item, monto: c.montoOriginal != null ? c.montoOriginal : c.monto,
+                   pagado: redondear((c.liquidado || 0) + (asignado[c.key] || 0)),
+                   ciclo: { fechaCorte: c.fechaCorte, fechaPago: c.fechaPago, mesPago: c.mesPago } }))
+    .sort((a, b) => a.dia - b.dia);
+}
 function getMesesConCargos(tarjeta, data, hastaMes) {
   const meses = new Set(getCargosTarjeta(tarjeta, data, hastaMes).map((c) => c.mesPago));
   return [...meses].sort((a, b) => (a < b ? 1 : -1));
@@ -879,7 +891,7 @@ function mesObjetivoTarjeta(t, data, mesPedido) {
   const base = mesDeFecha(proximaFechaDia(t.diaPago));
   let mes = base;
   for (let i = 0; i < 3; i++) {
-    if (getEstadoTarjeta(t, data, mes).pendiente > 0.005) return mes;
+    if (getEstadoPago(t, data, mes).pendiente > 0.005) return mes;
     mes = addMonths(mes, 1);
   }
   return base;
@@ -918,7 +930,7 @@ function responderAsistente(intencion, data, textoOriginal) {
 
   if (intencion === 'resumen') {
     const r = resumenMes(data, mesQ);
-    const tarjetas = data.tarjetas.map((t) => getEstadoTarjeta(t, data, mesQ));
+    const tarjetas = data.tarjetas.map((t) => getEstadoPago(t, data, mesQ));
     const deudaTC = tarjetas.reduce((a, e) => a + e.pendiente, 0);
     const cuotasMes = getCuotasActivas(data.cuotas, mesQ).reduce((a, c) => a + c.montoCuota, 0);
     const ahorrado = data.metas.reduce((a, m) => a + getTotalAportado(m), 0);
@@ -1065,7 +1077,7 @@ function responderAsistente(intencion, data, textoOriginal) {
     // Si no dice tarjeta, usa la que tenga el pago pendiente más cercano.
     const candidatas = nombradas.map((t) => {
       const mes = mesObjetivoTarjeta(t, data, mesPedido);
-      return { t, mes, est: getEstadoTarjeta(t, data, mes) };
+      return { t, mes, est: getEstadoPago(t, data, mes) };
     }).sort((a, b) => (b.est.pendiente > 0.005) - (a.est.pendiente > 0.005) || a.est.fechaPago - b.est.fechaPago);
     const { t, mes, est } = candidatas[0];
     if (!monto) return { texto: `Dime cuánto pagarías, por ejemplo: "¿qué pasa si pago Q1,000 a ${t.nombre}?". Ahora debes ${formatQ(est.pendiente)} para el ${formatFechaCorta(est.fechaPago)}.` };
@@ -1073,10 +1085,10 @@ function responderAsistente(intencion, data, textoOriginal) {
     const hoyStr = hoyISO();
     const fechaSim = isoDeFecha(est.fechaPago) < hoyStr ? isoDeFecha(est.fechaPago) : hoyStr;
     const sim = { ...data, pagosTarjeta: [...(data.pagosTarjeta || []), { id: '__sim__', tarjetaId: t.id, fecha: fechaSim, monto }] };
-    const despues = getEstadoTarjeta(t, sim, mes);
+    const despues = getEstadoPago(t, sim, mes);
     const mesSig = addMonths(mes, 1);
-    const sigAntes = getEstadoTarjeta(t, data, mesSig).pendiente;
-    const sigDespues = getEstadoTarjeta(t, sim, mesSig).pendiente;
+    const sigAntes = getEstadoPago(t, data, mesSig).pendiente;
+    const sigDespues = getEstadoPago(t, sim, mesSig).pendiente;
     const aFavor = despues.aFavor;
     const pagoFecha = formatFechaCorta(est.fechaPago);
     let texto;
@@ -1087,7 +1099,7 @@ function responderAsistente(intencion, data, textoOriginal) {
     } else {
       texto = `Si pagas ${formatQ(monto)} a ${t.nombre}, todavía quedarías debiendo ${formatQ(despues.pendiente)} para el ${pagoFecha}.`;
     }
-    const detalle = getEntradasTarjetaMes(t, sim, mes).map((e) => ({
+    const detalle = getEntradasPagoMes(t, sim, mes).map((e) => ({
       label: nombreEntrada(e) + (e.pagado >= e.monto - 0.005 && e.monto > 0 ? ' ✓' : e.pagado > 0 ? ` (cubre ${formatQ(e.pagado)})` : ''),
       valor: formatQ(e.monto),
     }));
@@ -1124,12 +1136,12 @@ function responderAsistente(intencion, data, textoOriginal) {
       const porMes = mesesPedidos.map((mes, idx) => {
         let monto = 0;
         tarjetasSel.forEach((t) => {
-          const est = getEstadoTarjeta(t, data, mes);
+          const est = getEstadoPago(t, data, mes);
           // El primer mes incluye lo pendiente de antes; los siguientes solo sus cargos nuevos
           // (suponiendo que pagas completo el mes anterior).
           const m = idx === 0 ? est.pendiente : Math.max(est.totalCiclo, 0);
           monto += m;
-          const detalle = getEntradasTarjetaMes(t, data, mes).map((e) => ({
+          const detalle = getEntradasPagoMes(t, data, mes).map((e) => ({
             label: nombreEntrada(e) + (e.pagado >= e.monto - 0.005 && e.monto > 0 ? ' ✓' : ''),
             valor: formatQ(e.monto),
           }));
@@ -1168,18 +1180,18 @@ function responderAsistente(intencion, data, textoOriginal) {
         // Próxima fecha de pago; si ese estado ya está cubierto, muestra el siguiente que sí tenga saldo.
         mes = mesDeFecha(proximaFechaDia(t.diaPago));
         for (let i = 0; i < 3; i++) {
-          if (getEstadoTarjeta(t, data, mes).pendiente > 0.005) break;
+          if (getEstadoPago(t, data, mes).pendiente > 0.005) break;
           const sig = addMonths(mes, 1);
-          if (getEstadoTarjeta(t, data, sig).pendiente > 0.005) { mes = sig; break; }
+          if (getEstadoPago(t, data, sig).pendiente > 0.005) { mes = sig; break; }
           if (i === 2) mes = mesDeFecha(proximaFechaDia(t.diaPago));
           else mes = sig;
         }
       }
       const fecha = fechaPagoDeMes(t, mes);
-      const est = getEstadoTarjeta(t, data, mes);
+      const est = getEstadoPago(t, data, mes);
       const pendiente = est.pendiente;
       const pagado = est.pagadoCiclo;
-      const detalle = getEntradasTarjetaMes(t, data, mes).map((e) => ({
+      const detalle = getEntradasPagoMes(t, data, mes).map((e) => ({
         label: nombreEntrada(e) + (e.pagado >= e.monto - 0.005 && e.monto > 0 ? ' ✓' : ''),
         valor: formatQ(e.monto),
       }));
@@ -1188,7 +1200,7 @@ function responderAsistente(intencion, data, textoOriginal) {
       if (est.pagosDelCiclo > 0.005) detalle.push({ label: 'Pagos registrados', valor: '-' + formatQ(est.pagosDelCiclo) });
       // Si se saltó un estado ya pagado, avisarlo.
       const mesProx = mesDeFecha(proximaFechaDia(t.diaPago));
-      const saltado = !mesPedido && mes !== mesProx ? getEstadoTarjeta(t, data, mesProx) : null;
+      const saltado = !mesPedido && mes !== mesProx ? getEstadoPago(t, data, mesProx) : null;
       return { t, fecha, pendiente, pagado, detalle, dias: diasHasta(fecha), aFavor: est.aFavor, saltado };
     }).sort((a, b) => a.fecha - b.fecha);
     const total = filas.reduce((a, f) => a + f.pendiente, 0);
@@ -1206,6 +1218,15 @@ function responderAsistente(intencion, data, textoOriginal) {
     const prox = filas[0];
     const unaTarjeta = filas.length === 1;
     let texto;
+    const preguntaHoy = /\bhoy\b/.test(normalizarTexto(textoOriginal || ''));
+    if (preguntaHoy && !mesPedido) {
+      const deHoy = filas.filter((f) => f.dias === 0 && f.pendiente > 0.005);
+      const sig = filas.filter((f) => f.pendiente > 0.005 && f.dias > 0).sort((a, b) => a.fecha - b.fecha)[0];
+      texto = deHoy.length
+        ? `Hoy vence ${deHoy.map((f) => `${f.t.nombre} (${formatQ(f.pendiente)})`).join(' y ')}. Total para hoy: ${formatQ(deHoy.reduce((a, f) => a + f.pendiente, 0))}.`
+        : `Hoy no tienes que pagar ninguna tarjeta ✓.${sig ? ` Tu próximo pago es ${sig.t.nombre}: ${formatQ(sig.pendiente)} el ${formatFechaCorta(sig.fecha)} (${textoDias(sig.dias)}).` : ' No tienes pagos pendientes por ahora.'}`;
+      return { texto, bloques: deHoy.length ? bloques.filter((b, i) => filas[i].dias === 0) : bloques.filter((b, i) => filas[i].pendiente > 0.005) };
+    }
     if (mesPedido) {
       texto = total > 0
         ? `Para ${monthLabel(mesPedido)} debes ${formatQ(total)}${unaTarjeta ? ` en ${prox.t.nombre}, con pago el ${formatFechaCorta(prox.fecha)}` : ' entre tus tarjetas'}.`
@@ -1354,7 +1375,7 @@ function responderAsistente(intencion, data, textoOriginal) {
     const tarjetasPend = data.tarjetas.reduce((a, t) => {
       const f = proximaFechaDia(t.diaPago);
       // Lo que aún falta pagar de tarjetas que vencen este mes (ya descuenta pagos registrados).
-      return mesDeFecha(f) === mesHoy ? a + getTotalTarjetaMes(t, data, mesHoy) : a;
+      return mesDeFecha(f) === mesHoy ? a + getEstadoPago(t, data, mesHoy).pendiente : a;
     }, 0);
     // Gastos fijos (efectivo/débito) que aún no se cobran este mes.
     const hoyStr = hoyISO();
@@ -1565,7 +1586,7 @@ function AccionCard({ accion, data, onConfirmar }) {
         {d.tipo === 'pago' && d.tarjetaId && (() => {
           const t = data.tarjetas.find((x) => x.id === d.tarjetaId);
           const mes = mesObjetivoTarjeta(t, data, null);
-          const e = getEstadoTarjeta(t, data, mes);
+          const e = getEstadoPago(t, data, mes);
           const extN = d.externo ? Math.min(parseFloat(d.montoExterno) || montoNum || 0, montoNum || 0) : 0;
           const efectivo = (montoNum - extN) * (d.moneda === 'USD' ? tc : 1);
           return <p className="hint">Debes {formatQ(e.pendiente)} para el {formatFechaCorta(e.fechaPago)}{montoNum > 0 ? ` · después del pago: ${formatQ(Math.max(e.pendiente - efectivo, 0))}${efectivo > e.pendiente ? ` (${formatQ(efectivo - e.pendiente)} a favor)` : ''}` : ''}</p>;

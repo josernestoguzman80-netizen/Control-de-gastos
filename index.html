@@ -829,8 +829,57 @@ function textoConMes(texto, mes) {
 }
 function detectarTarjetas(texto, tarjetas) {
   const t = normalizarTexto(texto);
-  const encontradas = tarjetas.filter((x) => normalizarTexto(x.nombre).trim() && t.includes(normalizarTexto(x.nombre).trim()));
+  const conBordes = ' ' + t.replace(/\s+/g, ' ') + ' ';
+  // Coincide con el nombre completo o con cualquier palabra del nombre ("bac" → "BAC VISA").
+  const encontradas = tarjetas.filter((x) => {
+    const n = normalizarTexto(x.nombre).replace(/\s+/g, ' ').trim();
+    if (!n) return false;
+    if (conBordes.includes(' ' + n + ' ')) return true;
+    return n.split(' ').some((w) => w.length >= 3 && conBordes.includes(' ' + w + ' '));
+  });
   return encontradas.length > 0 ? encontradas : tarjetas;
+}
+// Fecha que pide la pregunta: hoy, mañana, pasado mañana, ayer, antier, "el 5", "5 de octubre". Toma la ÚLTIMA mencionada.
+function detectarFechaConsulta(texto) {
+  const t = normalizarTexto(texto).replace(/\s+/g, ' ');
+  const hoy = hoyMedianoche();
+  const masDias = (n) => isoDeFecha(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + n));
+  const hallados = [];
+  const push = (re, fn) => { let m; const r = new RegExp(re, 'g'); while ((m = r.exec(t))) hallados.push({ pos: m.index, iso: fn(m) }); };
+  push('\\bpasado (de )?manana\\b', () => masDias(2));
+  push('(^|[^a-z])pasado\\b(?! manana)', (m) => (/(mes|ano|semana|viernes|lunes|martes|miercoles|jueves|sabado|domingo) $/.test(t.slice(0, m.index + m[1].length)) ? null : masDias(2)));
+  push('(?<!pasado )(?<!pasado de )\\bmanana\\b', () => masDias(1));
+  push('\\bhoy\\b', () => masDias(0));
+  push('\\b(antier|anteayer)\\b', () => masDias(-2));
+  push('\\bayer\\b', () => masDias(-1));
+  push('\\b(\\d{1,2}) de ' + MESES_REGEX + '(?: (?:de )?(20\\d\\d))?', (m) => {
+    const mi = m[2] === 'setiembre' ? 8 : MESES.map((x) => normalizarTexto(x).trim()).indexOf(m[2]);
+    let y = m[3] ? parseInt(m[3], 10) : hoy.getFullYear();
+    if (!m[3] && isoDe(y, mi + 1, parseInt(m[1], 10)) < masDias(-60)) y += 1;
+    return isoDe(y, mi + 1, parseInt(m[1], 10));
+  });
+  push('\\b(?:el|para el|al) (\\d{1,2})\\b(?! de)', (m) => {
+    const d = parseInt(m[1], 10); if (d < 1 || d > 31) return null;
+    let iso = isoDe(hoy.getFullYear(), hoy.getMonth() + 1, d);
+    if (iso < masDias(0)) { const sig = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1); iso = isoDe(sig.getFullYear(), sig.getMonth() + 1, d); }
+    return iso;
+  });
+  const validos = hallados.filter((h) => h.iso).sort((a, b) => a.pos - b.pos);
+  return validos.length ? validos[validos.length - 1].iso : null;
+}
+// Saldo de una tarjeta a una fecha (mismo cálculo que la pestaña Tarjetas en "saldo al día").
+function getSaldoTarjetaAl(tarjeta, data, iso) {
+  const cargos = getCargosTarjeta(tarjeta, data, addMonths(iso.slice(0, 7), 3)).filter((c) => c.fecha <= iso);
+  const pagos = getPagosDeTarjeta(tarjeta, data);
+  const neto = redondear(cargos.reduce((a, c) => a + c.monto, 0) - pagos.filter((p) => p.fechaISO <= iso).reduce((a, p) => a + p.monto, 0));
+  const saldoCierre = Math.max(neto, 0);
+  const posteriores = redondear(pagos.filter((p) => p.fechaISO > iso).reduce((a, p) => a + p.monto, 0));
+  const cubiertoDespues = redondear(Math.min(saldoCierre, posteriores));
+  // Próxima fecha de pago en o después de esa fecha.
+  const f = parseISODate(iso);
+  let fp = fechaEnMes(f.getFullYear(), f.getMonth() + 1, tarjeta.diaPago);
+  if (fp < f) fp = f.getMonth() === 11 ? fechaEnMes(f.getFullYear() + 1, 1, tarjeta.diaPago) : fechaEnMes(f.getFullYear(), f.getMonth() + 2, tarjeta.diaPago);
+  return { pendiente: redondear(saldoCierre - cubiertoDespues), aFavor: Math.max(-neto, 0), cubiertoDespues, fechaPago: fp, cargos };
 }
 function hoyMedianoche() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function diasHasta(fecha) { return Math.round((fecha - hoyMedianoche()) / 86400000); }
@@ -1161,6 +1210,38 @@ function responderAsistente(intencion, data, textoOriginal) {
     }
     const mesPedido = detectarMes(textoOriginal || '');
     const tarjetasPedidas = detectarTarjetas(textoOriginal || '', data.tarjetas);
+    const fechaQ = detectarFechaConsulta(textoOriginal || '');
+    if (!modoPorCorte(data) && (fechaQ || !mesPedido)) {
+      // Saldo a una fecha: hoy por defecto, o la que pidas ("mañana", "pasado", "el 5", "5 de octubre").
+      const hoyStr = hoyISO();
+      const iso = fechaQ || hoyStr;
+      const dif = diasHasta(parseISODate(iso));
+      const cuando = dif === 0 ? 'A día de hoy' : dif === 1 ? `Mañana (${formatFechaCorta(parseISODate(iso))})` : dif === 2 ? `Pasado mañana (${formatFechaCorta(parseISODate(iso))})` : dif === -1 ? `Ayer (${formatFechaCorta(parseISODate(iso))})` : `Al ${formatFechaCorta(parseISODate(iso))}`;
+      const filasF = tarjetasPedidas.map((t) => {
+        const e = getSaldoTarjetaAl(t, data, iso);
+        const nuevos = iso > hoyStr ? e.cargos.filter((c) => c.fecha > hoyStr && c.tipo !== 'ajuste') : [];
+        return { t, e, nuevos, dias: diasHasta(e.fechaPago) };
+      }).sort((a, b) => a.e.fechaPago - b.e.fechaPago);
+      const totalF = filasF.reduce((a, f) => a + f.e.pendiente, 0);
+      const nombres = filasF.length === 1 ? ` en ${filasF[0].t.nombre}` : '';
+      const texto = totalF > 0.005
+        ? `${cuando} debes ${formatQ(totalF)}${nombres || ' entre tus tarjetas'}.`
+        : `${cuando} ${filasF.length === 1 ? `${filasF[0].t.nombre} está` : 'tus tarjetas están'} en ${formatQ(0)} ✓. No tienes saldo pendiente.`;
+      return {
+        texto,
+        bloques: filasF.map((f) => ({
+          titulo: f.t.nombre,
+          subtitulo: `${dif === 0 ? 'Saldo a hoy' : `Saldo al ${formatFechaCorta(parseISODate(iso))}`} · ${isoDeFecha(f.e.fechaPago) === iso ? 'ese día vence tu pago' : `próximo pago el ${formatFechaCorta(f.e.fechaPago)}`}`,
+          monto: f.e.pendiente,
+          tono: f.e.pendiente > 0.005 ? 'warning' : 'positive',
+          nota: f.e.pendiente > 0.005 ? (f.e.cubiertoDespues > 0.005 ? `Ya registraste pagos posteriores por ${formatQ(f.e.cubiertoDespues)}.` : null)
+                : f.e.aFavor > 0.005 ? `Sin saldo pendiente · ${formatQ(f.e.aFavor)} a favor` : 'Sin saldo pendiente',
+          alerta: null,
+          detalle: f.nuevos.map((c) => ({ label: `${nombreEntrada({ tipo: c.tipo, item: c.item })} · ${formatFechaCorta(parseISODate(c.fecha))}`, valor: formatQ(c.monto) })),
+        })),
+        nota: iso > hoyStr && filasF.some((f) => f.nuevos.length) ? 'Incluye los cargos programados (fijos y cuotas) entre hoy y esa fecha.' : null,
+      };
+    }
     const aHoy = !mesPedido && !modoPorCorte(data); // saldo al día: lo que debes hoy
     const filas = tarjetasPedidas.map((t) => {
       let mes;

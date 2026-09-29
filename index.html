@@ -2147,6 +2147,21 @@ function VerificarCorreo({ user }) {
   );
 }
 
+// Nombre para saludar: el que el usuario configuró en Ajustes; si no, el de Google o el inicio del correo.
+function nombreGuardadoKey(user) { return `coinpocket_nombre_${user && user.uid}`; }
+function primerNombre(user) {
+  if (!user || user.local) return '';
+  const preferido = (leerLS(nombreGuardadoKey(user)) || '').trim();
+  return preferido || primerNombreAuto(user);
+}
+function primerNombreAuto(user) {
+  if (!user || user.local) return '';
+  const nombre = (user.displayName || '').trim().split(/\s+/)[0];
+  if (nombre) return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  const base = ((user.email || '').split('@')[0] || '').split(/[._\-+0-9]/)[0];
+  return base ? base.charAt(0).toUpperCase() + base.slice(1).toLowerCase() : '';
+}
+
 /* ============================== APP PRINCIPAL ============================== */
 function ControlGastos({ user, onIrALogin }) {
   const [data, setData] = useState({ ingresos: {}, gastos: [], cuotas: [], gastosFijos: [], metas: [], tarjetas: [], gastosTC: [], pagosTarjeta: [], ajustesTarjeta: [], tipoCambio: TIPO_CAMBIO_DEFAULT });
@@ -2238,6 +2253,8 @@ function ControlGastos({ user, onIrALogin }) {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(76);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
+  const [nombreDraft, setNombreDraft] = useState('');
+  const [nombreMsg, setNombreMsg] = useState('');
   const [exportForm, setExportForm] = useState(false);
   const [exportPass, setExportPass] = useState('');
   const [exportPass2, setExportPass2] = useState('');
@@ -2351,6 +2368,18 @@ function ControlGastos({ user, onIrALogin }) {
   }, [data, loaded, user.uid]);
 
   useEffect(() => { dataRef.current = data; }, [data]);
+  // El nombre de bienvenida se guarda en tu cuenta (config) y se copia a este dispositivo para mostrarlo al cargar.
+  const nombreBienvenida = (data.config && data.config.nombreBienvenida) || '';
+  useEffect(() => {
+    if (!loaded || user.local) return;
+    escribirLS(nombreGuardadoKey(user), nombreBienvenida || null);
+    setNombreDraft(nombreBienvenida);
+  }, [loaded, nombreBienvenida]);
+  function guardarNombreBienvenida() {
+    const limpio = nombreDraft.replace(/\s+/g, ' ').trim().slice(0, 30);
+    setData((prev) => ({ ...prev, config: { ...(prev.config || {}), nombreBienvenida: limpio } }));
+    setNombreMsg(limpio ? `Listo ✓ Te saludaremos como "${limpio}".` : 'Listo ✓ Usaremos el nombre de tu cuenta.');
+  }
   // Respaldo automático: al abrir la app, si el último tiene más de 7 días, guarda una copia (se conservan 4).
   function coleccionRespaldos() { return db.collection(STORAGE_KEY).doc(user.uid).collection('respaldos'); }
   async function cargarRespaldos() {
@@ -2937,7 +2966,11 @@ function ControlGastos({ user, onIrALogin }) {
     return (
       <div className="app-shell">
         <style>{STYLES}</style>
-        <div className="loading-screen">Abriendo tu dashboard…</div>
+        <div className="loading-screen bienvenida">
+          <Logo size={44} />
+          <div className="bienvenida-titulo">Bienvenido a CoinPocket{primerNombre(user) ? `, ${primerNombre(user)}` : ''}</div>
+          <div className="bienvenida-sub">Cargando tus datos…</div>
+        </div>
       </div>
     );
   }
@@ -4410,6 +4443,24 @@ function ControlGastos({ user, onIrALogin }) {
           <div className="card">
             <h2 className="section-title">Configuración</h2>
             <p className="section-sub">Ajustes generales de la app.</p>
+            {!user.local && (
+              <div className="settings-row settings-col">
+                <div>
+                  <div className="settings-row-title">Nombre en la bienvenida</div>
+                  <p className="meta-detail">Cómo quieres que te salude CoinPocket al abrir. Déjalo vacío para usar el nombre de tu cuenta ({primerNombreAuto(user) || 'sin nombre'}).</p>
+                </div>
+                <div className="monto-row" style={{ marginTop: 10 }}>
+                  <input className="field" maxLength={30} placeholder="Ej. José, Neto, Don José…" value={nombreDraft}
+                         onChange={(e) => { setNombreDraft(e.target.value); setNombreMsg(''); }}
+                         onKeyDown={(e) => { if (e.key === 'Enter') guardarNombreBienvenida(); }} />
+                  <button className="btn-add small" onClick={guardarNombreBienvenida}>Guardar</button>
+                </div>
+                <p className="hint" style={{ marginTop: 8, color: 'var(--text-secondary)' }}>
+                  Vista previa: Bienvenido a CoinPocket{(nombreDraft.trim() || primerNombreAuto(user)) ? `, ${nombreDraft.trim() || primerNombreAuto(user)}` : ''}
+                </p>
+                {nombreMsg && <p className="hint" style={{ marginTop: 4 }}>{nombreMsg}</p>}
+              </div>
+            )}
             <div className="settings-row">
               <div>
                 <div className="settings-row-title">Calcular tarjetas por fecha de corte</div>
@@ -4929,6 +4980,9 @@ const STYLES = `
 .asis-send { width:44px; flex-shrink:0; border:none; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 
 .loading-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; color:var(--text-secondary); font-family:'Inter', sans-serif; }
+.loading-screen.bienvenida { flex-direction:column; gap:14px; text-align:center; padding:0 24px; animation: riseIn 0.4s ease both; }
+.bienvenida-titulo { font-size:22px; font-weight:800; color:var(--text); letter-spacing:-0.01em; }
+.bienvenida-sub { font-size:13px; color:var(--text-secondary); }
 
 @media (max-width: 480px) {
   .masthead { font-size:19px; }

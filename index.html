@@ -766,6 +766,7 @@ function detectarIntencion(texto, data) {
   if (esAccionRegistrar(texto)) return 'registrar';
   if (/\b(si|cuando|que pasa si|que pasaria si)\b.*\b(pago|pagara|pagase|abono|abonara|le pago|le abono|deposito|cancelo)\b/.test(t) || tiene('simula', 'que pasa si pago', 'que pasaria si pago')) return 'simular_pago';
   if (tiene('alcanza', 'puedo comprar', 'me da para', 'puedo gastar')) return 'alcanza';
+  if (/atrasad|meses anteriores|mes anterior|otros meses|de que mes|de donde sale|de donde viene|desglos|ese monto|ese saldo|esa deuda|por que debo|de que es/.test(t)) return 'desglose';
   if (tiene('resumen', 'como voy', 'como estoy', 'como van mis finanzas', 'situacion')) return 'resumen';
   if (tiene('corte', 'cierre', 'cierra')) return 'proximo_corte';
   if (tiene('he pagado', 'pagos que hice', 'pagos realizados', 'historial de pagos', 'cuanto pague', 'pagos a la tarjeta', 'pagado a mis tarjetas', 'pagado a la tarjeta')) return 'pagos_realizados';
@@ -880,6 +881,24 @@ function getSaldoTarjetaAl(tarjeta, data, iso) {
   let fp = fechaEnMes(f.getFullYear(), f.getMonth() + 1, tarjeta.diaPago);
   if (fp < f) fp = f.getMonth() === 11 ? fechaEnMes(f.getFullYear() + 1, 1, tarjeta.diaPago) : fechaEnMes(f.getFullYear(), f.getMonth() + 2, tarjeta.diaPago);
   return { pendiente: redondear(saldoCierre - cubiertoDespues), aFavor: Math.max(-neto, 0), cubiertoDespues, fechaPago: fp, cargos };
+}
+function getDeudaPorMes(tarjeta, data, iso) {
+  const cargos = getCargosTarjeta(tarjeta, data, addMonths(iso.slice(0, 7), 3)).filter((c) => c.fecha <= iso)
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  let credito = getPagosDeTarjeta(tarjeta, data).reduce((a, p) => a + p.monto, 0)
+    + cargos.filter((c) => c.monto < 0).reduce((a, c) => a - c.monto, 0);
+  const porMes = {}; const items = {};
+  cargos.filter((c) => c.monto > 0).forEach((c) => {
+    const cubre = Math.min(c.monto, Math.max(credito, 0));
+    credito -= cubre;
+    const falta = redondear(c.monto - cubre);
+    if (falta > 0.005) {
+      const m = c.fecha.slice(0, 7);
+      porMes[m] = redondear((porMes[m] || 0) + falta);
+      (items[m] = items[m] || []).push({ label: `${nombreEntrada({ tipo: c.tipo, item: c.item })} · ${formatFechaCorta(parseISODate(c.fecha))}`, valor: formatQ(falta) });
+    }
+  });
+  return { porMes, items, total: redondear(Object.values(porMes).reduce((a, v) => a + v, 0)) };
 }
 function hoyMedianoche() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function diasHasta(fecha) { return Math.round((fecha - hoyMedianoche()) / 86400000); }
@@ -1316,6 +1335,42 @@ function responderAsistente(intencion, data, textoOriginal) {
     };
   }
 
+  if (intencion === 'desglose') {
+    if (data.tarjetas.length === 0) return { texto: 'No tienes tarjetas registradas.' };
+    const hoyStr = hoyISO();
+    const fechaQ = detectarFechaConsulta(textoOriginal || '');
+    const mesP = detectarMes(textoOriginal || '');
+    const iso = fechaQ || (mesP && mesP !== mesHoy ? isoDeMes(mesP, 31) : hoyStr);
+    const mesRef = iso.slice(0, 7);
+    const tarjetasSel = detectarTarjetas(textoOriginal || '', data.tarjetas);
+    const porTarjeta = tarjetasSel.map((t) => ({ t, d: getDeudaPorMes(t, data, iso) }));
+    const total = redondear(porTarjeta.reduce((a, x) => a + x.d.total, 0));
+    const meses = {};
+    porTarjeta.forEach((x) => Object.entries(x.d.porMes).forEach(([m, v]) => { meses[m] = redondear((meses[m] || 0) + v); }));
+    const orden = Object.keys(meses).sort();
+    const atrasado = redondear(orden.filter((m) => m < mesRef).reduce((a, m) => a + meses[m], 0));
+    const delMes = redondear(meses[mesRef] || 0);
+    const cuando = iso === hoyStr ? 'hoy' : `al ${formatFechaCorta(parseISODate(iso))}`;
+    if (total <= 0.005) return { texto: `No debes nada ${cuando}${tarjetasSel.length === 1 ? ` en ${tarjetasSel[0].nombre}` : ''} ✓, así que no hay nada atrasado.` };
+    const texto = atrasado <= 0.005
+      ? `Los ${formatQ(total)} que debes ${cuando} son solo de ${monthLabel(mesRef)}. No tienes nada atrasado de meses anteriores ✓.`
+      : delMes <= 0.005
+        ? `Los ${formatQ(total)} que debes ${cuando} son todos de meses anteriores (atrasados).`
+        : `De los ${formatQ(total)} que debes ${cuando}, ${formatQ(delMes)} son de ${monthLabel(mesRef)} y ${formatQ(atrasado)} vienen de meses anteriores.`;
+    return {
+      texto,
+      filas: [
+        ...orden.map((m) => ({ label: `${monthLabel(m)}${m < mesRef ? ' (atrasado)' : ''}`, valor: formatQ(meses[m]), tono: m < mesRef ? 'negative' : null })),
+        { label: 'Total', valor: formatQ(total), fuerte: true },
+      ],
+      bloques: porTarjeta.filter((x) => x.d.total > 0.005).map((x) => ({
+        titulo: x.t.nombre, subtitulo: `Lo que falta pagar, por compra`, monto: x.d.total, tono: 'warning', nota: null, alerta: null,
+        detalle: Object.keys(x.d.items).sort().flatMap((m) => x.d.items[m]),
+      })),
+      nota: 'Tus pagos cubren primero las compras más antiguas; esto es lo que queda sin pagar.',
+    };
+  }
+
   if (intencion === 'proximo_corte') {
     if (data.tarjetas.length === 0) return { texto: 'No tienes tarjetas registradas todavía.' };
     const filas = data.tarjetas.map((t) => {
@@ -1697,7 +1752,11 @@ function AsistentePanel({ data, onClose, bottomOffset, onRegistrar }) {
         .replace(/(este|proximo|siguiente|otro) mes|mes que viene|20\d\d|\d+(\.\d+)?/g, ' ');
       textoParaResponder = sinMeses + ' ' + pregunta;
     }
-    const meses = detectarMeses(textoParaResponder);
+    if (intencion === 'desglose' && !intencionForzada) {
+      // "¿Ese monto es solo de octubre o de meses atrasados?" → desglosa lo que se preguntó antes.
+      textoParaResponder = ctx.intencion && ctx.intencion !== 'desglose' ? ctx.texto : (ctx.textoBase || ctx.texto || pregunta);
+    }
+    const meses = intencion === 'desglose' ? [] : detectarMeses(textoParaResponder);
     const MES_A_MES = ['saldo', 'gastado', 'categorias', 'categoria', 'mayor', 'cuotas', 'ingreso', 'resumen', 'buscar', 'pagos_realizados', 'dolares'];
     let respuestas;
     if (meses.length > 1 && MES_A_MES.includes(intencion)) {
@@ -1706,7 +1765,7 @@ function AsistentePanel({ data, onClose, bottomOffset, onRegistrar }) {
     } else {
       respuestas = [{ de: 'bot', respuesta: responderAsistente(intencion, data, textoParaResponder) }];
     }
-    if (intencion && !['saludo', 'gracias', 'ayuda', 'registrar'].includes(intencion)) contextoRef.current = { intencion, texto: textoParaResponder };
+    if (intencion && !['saludo', 'gracias', 'ayuda', 'registrar', 'desglose'].includes(intencion)) contextoRef.current = { intencion, texto: textoParaResponder };
     setMensajes((m) => [...m, { de: 'yo', texto: pregunta }, ...respuestas]);
   }
   function enviar() {

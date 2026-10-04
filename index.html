@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <!-- Política de contenido: solo se puede cargar código y conectarse a estos sitios (Firebase, Google y el CDN de librerías). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-oDsnbxhalAHb8Nqwu/KGjDnOqKsoaYUdzFIQglAL0XQ=' 'sha256-tGZufnQsYB1jPUGC52fPAjk+S8J9FgVw8ilyyezX3JE=' https://cdn.jsdelivr.net https://apis.google.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net; connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.firebaseapp.com https://www.gstatic.com; frame-src https://control-de-gastos-mensuales.firebaseapp.com https://www.google.com https://recaptcha.google.com https://www.recaptcha.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-oDsnbxhalAHb8Nqwu/KGjDnOqKsoaYUdzFIQglAL0XQ=' 'sha256-yMTwKu4PmnxsC0e/eahSiHJtQDJ0IV2WsktnwOIkAsU=' https://cdn.jsdelivr.net https://apis.google.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net; connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.firebaseapp.com https://www.gstatic.com; frame-src https://control-de-gastos-mensuales.firebaseapp.com https://www.google.com https://recaptcha.google.com https://www.recaptcha.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <title>CoinPocket</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='6' y='14' width='36' height='28' rx='8' fill='%230A84FF'/%3E%3Cpath d='M10 20 H38' stroke='%230868C9' stroke-width='2' stroke-linecap='round' opacity='0.55'/%3E%3Ccircle cx='34' cy='12' r='10' fill='%23E0B25C' stroke='%23C79A46' stroke-width='1.5'/%3E%3Ccircle cx='34' cy='12' r='5' fill='none' stroke='%23C79A46' stroke-width='1.4'/%3E%3C/svg%3E" />
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
@@ -586,7 +586,7 @@ const METODOS_PAGO = [{
 }];
 const CONSULTAS = [{
   pregunta: 'Mi tarjeta ya tenía deuda antes de usar la app, ¿cómo la registro?',
-  respuesta: ['Ve a Ajustes → Saldo inicial de tarjetas, toca el lápiz de la tarjeta y escribe lo que debías con la fecha de ese saldo (por ejemplo, lo que dice hoy tu banca en línea).', 'Ese saldo vence en la siguiente fecha de pago y tus pagos lo van bajando igual que cualquier compra. Así no necesitas usar "Ajustar saldo".', 'Los pagos que hiciste ANTES de esa fecha ya están incluidos en ese saldo; si los tienes registrados, márcalos como "Compras no registradas".']
+  respuesta: ['Ve a Ajustes → Saldo inicial de tarjetas, toca el lápiz de la tarjeta y escribe lo que debías con la fecha de ese saldo (por ejemplo, lo que dice hoy tu banca en línea).', 'Ese saldo vence en la siguiente fecha de pago y tus pagos lo van bajando igual que cualquier compra. Así no necesitas usar "Corregir lo que debo".', 'Los pagos que hiciste ANTES de esa fecha ya están incluidos en ese saldo; si los tienes registrados, márcalos como "Compras no registradas".']
 }, {
   pregunta: 'La app dice que tengo saldo a favor, pero no es cierto',
   respuesta: ['Pasa cuando registras un pago que incluía compras que no anotaste en la app. La app solo conoce las compras registradas, así que ve el pago más grande y lo toma como saldo a favor.', 'Para corregirlo ve a Tarjetas → Historial de pagos, toca "Compras no registradas" en ese pago e indica cuánto fue. Esa parte deja de descontarse de tu deuda. Para quitarlo, deja el monto vacío o en 0.', 'Al registrar un pago nuevo también puedes marcar "Una parte es de compras que no registré" y escribir la cantidad.']
@@ -594,13 +594,13 @@ const CONSULTAS = [{
   pregunta: '¿Qué pasa si pago más o menos de lo que debo en la tarjeta?',
   respuesta: ['Un pago siempre baja lo que debes. Si lo haces después de la fecha de pago, se aplica igual a lo que tenías pendiente.', 'El pago cubre tus compras de la más antigua a la más reciente. Las que alcanza a cubrir quedan "Pagada" y la que queda a medias muestra cuánto se pagó.', 'Si pagas menos, lo que falta pasa al siguiente mes como "Pendiente de meses anteriores". Si pagas más, la diferencia queda como saldo a favor y se resta del siguiente estado de cuenta.']
 }, {
-  pregunta: '¿Para qué sirve "Ajustar saldo"?',
+  pregunta: '¿Para qué sirve "Corregir lo que debo"?',
   respuesta: ['Para que la app cuadre con tu estado de cuenta, por ejemplo cuando el banco cobra intereses o comisiones que la app no calcula.', 'Escribe lo que debes según el banco y la fecha de ese saldo. Desde esa fecha la app toma ese monto como lo que te falta pagar en tu siguiente fecha de pago.', 'Las compras y pagos anteriores a esa fecha quedan como ya incluidos: las compras más antiguas se marcan como pagadas y lo pendiente se asigna a las más recientes. Lo que compres o pagues después se suma o resta normal.', 'Los ajustes se ven solo en Ajustes → Ajustes de saldo. Si uno ya no aplica (por ejemplo, te deja un saldo a favor que no es real), quítalo con el ícono de basurero.']
 }, {
   pregunta: '¿Cómo calcula la app lo que debo en la tarjeta?',
   respuesta: ['Por defecto usa "saldo al día": lo que compras hoy suma a tu deuda hoy, y lo que pagas hoy la baja hoy. En cada mes ves lo que debías al cierre de ese mes (o a hoy, si es el mes actual).', 'Si prefieres ver lo que vence en cada fecha de pago según el corte, enciende Ajustes → Configuración → "Calcular tarjetas por fecha de corte".']
 }, {
-  pregunta: '¿Por qué una compra con tarjeta aparece en otro mes? (modo por corte)',
+  pregunta: '¿Por qué una compra con tarjeta aparece en otro mes? (ver por estado de cuenta)',
   respuesta: ['Las compras con tarjeta se agrupan por el mes en que se pagan, no por el mes en que compraste. Una compra hecha después del día de corte entra en el siguiente corte y se paga en la fecha de pago de ese ciclo.', 'Esto aplica también a gastos únicos, gastos fijos y cuotas que marques con tarjeta.']
 }, {
   pregunta: '¿Por qué mi saldo en Inicio no baja cuando compro con tarjeta?',
@@ -610,10 +610,10 @@ const CONSULTAS = [{
   respuesta: ['Los gastos fijos en dólares (como suscripciones) se recalculan cada vez que cambias el tipo de cambio, porque cada mes se cobran a la tasa del día.', 'Las compras únicas, compras con tarjeta y cuotas en dólares conservan la tasa con la que las registraste.']
 }, {
   pregunta: '¿Cómo marco una compra como pagada sin registrar un pago?',
-  respuesta: ['Enciende Ajustes → Configuración → "Marcar compras como pagadas". En Tarjetas, dentro del historial de cada tarjeta, aparecerá "Marcar pagada" en las compras pendientes.', 'Una compra marcada deja de sumar a lo que debes. Para deshacerlo toca "Quitar pagada". Si apagas el interruptor, los botones se ocultan pero lo que ya marcaste se conserva.', 'Marcar una compra no registra un pago, así que tu saldo en Inicio no cambia.']
+  respuesta: ['Enciende Ajustes → Tarjetas → "Mostrar botón Ya la pagué". En Tarjetas, dentro del historial de cada tarjeta, aparecerá "Ya la pagué" en las compras pendientes.', 'Una compra marcada deja de sumar a lo que debes. Para deshacerlo toca "Quitar pagada". Si apagas el interruptor, los botones se ocultan pero lo que ya marcaste se conserva.', 'Marcar una compra no registra un pago, así que tu saldo en Inicio no cambia.']
 }, {
   pregunta: '¿La app calcula intereses de la tarjeta?',
-  respuesta: ['No. Si pagas menos del total, el banco puede cobrarte intereses que la app no suma. Usa "Ajustar saldo" con el monto de tu estado de cuenta para que cuadre.']
+  respuesta: ['No. Si pagas menos del total, el banco puede cobrarte intereses que la app no suma. Usa "Corregir lo que debo" con el monto de tu estado de cuenta para que cuadre.']
 }, {
   pregunta: '¿Qué le puedo preguntar o pedir al asistente?',
   respuesta: ['Preguntas como "¿cuánto debo en noviembre y diciembre?", "¿cuánto pago de Claude?", "¿cuánto gasté en comida?" o "¿qué pasa si pago 1000?". Puedes seguir con "¿y para enero?".', 'También puede registrar por ti: "gasté 80 en almuerzo en efectivo", "pagué 500 a BAC" o "registra un gasto fijo de Netflix $15.99 el día 5". Siempre te muestra los datos para revisarlos y solo guarda cuando tocas Confirmar.']
@@ -1619,11 +1619,13 @@ function resumenMes(data, mes) {
   const ingreso = ing.q1 + ing.q2 + ing.bono;
   const gastos = getTotalGastosMes(data, mes);
   const aportes = data.metas.reduce((s, m) => s + (m.aportes && m.aportes[mes] || 0), 0);
+  const arrastre = arrastreMes(data, mes);
   return {
     ingreso,
     gastos,
     aportes,
-    saldo: ingreso - gastos - aportes
+    arrastre,
+    saldo: ingreso + arrastre - gastos - aportes
   };
 }
 function categoriasMes(data, mes) {
@@ -1803,7 +1805,7 @@ function responderAsistente(intencion, data, textoOriginal) {
     const mesPedido = detectarMes(textoOriginal || '');
     const pagos = getHistorialPagosTarjeta(data.tarjetas, data.pagosTarjeta || []).filter(p => !mesPedido || p.fecha.slice(0, 7) === mesPedido);
     if (pagos.length === 0) return {
-      texto: mesPedido ? `No registraste pagos de tarjeta en ${monthLabel(mesPedido)}.` : 'Todavía no has registrado pagos a tus tarjetas. Hazlo en la pestaña Tarjetas → "+ Registrar pago".'
+      texto: mesPedido ? `No registraste pagos de tarjeta en ${monthLabel(mesPedido)}.` : 'Todavía no has registrado pagos a tus tarjetas. Hazlo con el botón "Pagar" de cada tarjeta en la pestaña Tarjetas.'
     };
     const total = pagos.reduce((a, p) => a + p.monto, 0);
     return {
@@ -3395,7 +3397,7 @@ function AgregarAsistido({
   onGuardar,
   inicial
 }) {
-  const [paso, setPaso] = useState('tipo');
+  const [paso, setPaso] = useState(inicial && inicial.tipo ? 'datos' : 'tipo');
   const [f, setF] = useState({
     tipo: '',
     descripcion: '',
@@ -3789,6 +3791,572 @@ function AgregarAsistido({
     onClick: onCerrar
   }, "Terminar"))));
 }
+// ===== Vista previa: buscadores, guía de bienvenida, ayuda ⓘ y Ajustes por grupos =====
+Object.assign(ICON_PATHS, {
+  search: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "11",
+    cy: "11",
+    r: "7"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "21",
+    y1: "21",
+    x2: "16.65",
+    y2: "16.65"
+  })),
+  info: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "11",
+    x2: "12",
+    y2: "16"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "7.6",
+    r: "0.6",
+    fill: "currentColor"
+  })),
+  user: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "8",
+    r: "4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 21c0-4 4-6 8-6s8 2 8 6"
+  })),
+  database: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("ellipse", {
+    cx: "12",
+    cy: "5",
+    rx: "8",
+    ry: "3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"
+  })),
+  help: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.7-2.5 2-2.5 3.5"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "17",
+    r: "0.6",
+    fill: "currentColor"
+  }))
+});
+
+// Ícono ⓘ que muestra una explicación corta al tocarlo.
+function Info({
+  texto
+}) {
+  const [abierto, setAbierto] = useState(false);
+  return /*#__PURE__*/React.createElement("span", {
+    className: "info-wrap"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "info-btn",
+    "aria-label": "Qu\xE9 significa",
+    onClick: e => {
+      e.stopPropagation();
+      setAbierto(v => !v);
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "info",
+    size: 14
+  })), abierto && /*#__PURE__*/React.createElement("span", {
+    className: "info-pop",
+    onClick: e => {
+      e.stopPropagation();
+      setAbierto(false);
+    }
+  }, texto));
+}
+const METODO_LABEL = {
+  efectivo: 'Efectivo',
+  debito: 'Débito',
+  tarjeta: 'Tarjeta'
+};
+const normTxt = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// Junta todos los movimientos de todos los meses en una sola lista para buscar.
+function todosLosMovimientos(data) {
+  const tName = id => {
+    const t = data.tarjetas.find(x => x.id === id);
+    return t ? t.nombre : '';
+  };
+  const out = [];
+  (data.gastos || []).forEach(g => out.push({
+    id: 'g' + g.id,
+    tipo: 'compra',
+    desc: g.descripcion,
+    cat: g.categoria,
+    monto: g.monto,
+    fecha: g.fecha || isoDeMes(g.mes, g.dia || 1),
+    mes: g.mes,
+    metodo: g.metodoPago,
+    tarjetaId: g.tarjetaId,
+    tarjeta: tName(g.tarjetaId)
+  }));
+  (data.gastosTC || []).forEach(g => out.push({
+    id: 't' + g.id,
+    tipo: 'compra',
+    desc: g.descripcion,
+    cat: g.categoria,
+    monto: g.monto,
+    fecha: g.fechaCompra,
+    mes: (g.fechaCompra || '').slice(0, 7),
+    metodo: 'tarjeta',
+    tarjetaId: g.tarjetaId,
+    tarjeta: tName(g.tarjetaId)
+  }));
+  (data.cuotas || []).forEach(c => out.push({
+    id: 'c' + c.id,
+    tipo: 'cuota',
+    desc: c.descripcion,
+    cat: c.categoria,
+    monto: c.montoTotal,
+    fecha: isoDeMes(c.mesInicio, c.dia || 1),
+    mes: c.mesInicio,
+    metodo: c.metodoPago || 'tarjeta',
+    tarjetaId: c.tarjetaId,
+    tarjeta: tName(c.tarjetaId),
+    numCuotas: c.numCuotas
+  }));
+  (data.gastosFijos || []).forEach(f => out.push({
+    id: 'f' + f.id,
+    tipo: 'fijo',
+    desc: f.descripcion,
+    cat: f.categoria,
+    monto: f.monto,
+    fecha: isoDeMes(f.mesInicio, f.dia || 1),
+    mes: f.mesInicio,
+    metodo: f.metodoPago,
+    tarjetaId: f.tarjetaId,
+    tarjeta: tName(f.tarjetaId)
+  }));
+  (data.pagosTarjeta || []).forEach(p => out.push({
+    id: 'p' + p.id,
+    tipo: 'pago',
+    desc: 'Pago a ' + (tName(p.tarjetaId) || 'tarjeta'),
+    cat: null,
+    monto: p.monto,
+    fecha: p.fecha,
+    mes: (p.fecha || '').slice(0, 7),
+    metodo: 'pago',
+    tarjetaId: p.tarjetaId,
+    tarjeta: tName(p.tarjetaId)
+  }));
+  return out.sort((a, b) => a.fecha < b.fecha ? 1 : -1);
+}
+function coincide(m, q) {
+  if (!q) return true;
+  const n = normTxt(q);
+  const montoTxt = Number(m.monto || 0).toFixed(2);
+  return normTxt(m.desc).includes(n) || m.cat && normTxt(catLabel(m.cat)).includes(n) || normTxt(m.tarjeta).includes(n) || montoTxt.includes(n.replace(/[q,\s]/g, ''));
+}
+function Chip({
+  activo,
+  onClick,
+  children
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `agr-chip ${activo ? 'activo' : ''}`,
+    onClick: onClick
+  }, children);
+}
+
+// Buscador de Inicio: todos los movimientos, todos los meses.
+function BuscadorMovimientos({
+  data,
+  onIrAMes,
+  onCerrar
+}) {
+  const [q, setQ] = useState('');
+  const [metodo, setMetodo] = useState('todos');
+  const todos = useMemo(() => todosLosMovimientos(data), [data]);
+  const res = todos.filter(m => coincide(m, q) && (metodo === 'todos' || m.metodo === metodo || metodo === 'tarjeta' && m.metodo === 'pago'));
+  const hayFiltro = q.trim() || metodo !== 'todos';
+  return /*#__PURE__*/React.createElement("div", {
+    className: "buscador"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "buscador-input"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "search",
+    size: 16
+  }), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    placeholder: "Buscar por nombre, monto o categor\xEDa",
+    value: q,
+    onChange: e => setQ(e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn small",
+    onClick: onCerrar,
+    "aria-label": "Cerrar buscador"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 14
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "agr-chips",
+    style: {
+      marginTop: 8
+    }
+  }, [['todos', 'Todos'], ['efectivo', 'Efectivo'], ['debito', 'Débito'], ['tarjeta', 'Tarjeta']].map(([k, l]) => /*#__PURE__*/React.createElement(Chip, {
+    key: k,
+    activo: metodo === k,
+    onClick: () => setMetodo(k)
+  }, l))), hayFiltro && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    className: "buscador-cuenta"
+  }, res.length === 0 ? 'Sin resultados' : `${res.length} resultado${res.length === 1 ? '' : 's'} en todos los meses`), /*#__PURE__*/React.createElement("ul", {
+    className: "buscador-lista"
+  }, res.slice(0, 40).map(m => /*#__PURE__*/React.createElement("li", {
+    key: m.id
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "buscador-fila",
+    onClick: () => onIrAMes(m.mes)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "buscador-fila-main"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "buscador-desc"
+  }, m.desc), /*#__PURE__*/React.createElement("span", {
+    className: "buscador-meta"
+  }, formatFechaCorta(parseISODate(m.fecha)), " \xB7 ", m.tipo === 'pago' ? 'Pago de tarjeta' : m.tipo === 'fijo' ? 'Gasto fijo' : m.tipo === 'cuota' ? `${m.numCuotas} cuotas` : METODO_LABEL[m.metodo] || '', m.tarjeta && m.tipo !== 'pago' ? ` · ${m.tarjeta}` : '')), /*#__PURE__*/React.createElement("span", {
+    className: `buscador-monto ${m.tipo === 'pago' ? 'positive' : ''}`
+  }, formatQ(m.monto)))))), res.length > 40 && /*#__PURE__*/React.createElement("p", {
+    className: "buscador-cuenta"
+  }, "Mostrando los 40 m\xE1s recientes. Escribe algo m\xE1s espec\xEDfico.")));
+}
+
+// Buscador de Tarjetas: solo compras, cuotas y pagos hechos con tarjeta.
+function BuscadorTarjetas({
+  data,
+  onIrAMes,
+  onCerrar
+}) {
+  const [q, setQ] = useState('');
+  const [tarjetaId, setTarjetaId] = useState('todas');
+  const [tipo, setTipo] = useState('todos');
+  const todos = useMemo(() => todosLosMovimientos(data).filter(m => m.tarjetaId && (m.metodo === 'tarjeta' || m.tipo === 'pago')), [data]);
+  const res = todos.filter(m => coincide(m, q) && (tarjetaId === 'todas' || m.tarjetaId === tarjetaId) && (tipo === 'todos' || tipo === 'compras' && (m.tipo === 'compra' || m.tipo === 'fijo') || tipo === 'cuotas' && m.tipo === 'cuota' || tipo === 'pagos' && m.tipo === 'pago'));
+  const hoy = hoyISO();
+  const detalle = m => {
+    const t = data.tarjetas.find(x => x.id === m.tarjetaId);
+    if (m.tipo === 'pago') return `Pago registrado el ${formatFechaCorta(parseISODate(m.fecha))}`;
+    if (m.tipo === 'cuota') return `${m.numCuotas} cuotas de ${formatQ(m.monto / m.numCuotas)} · desde ${monthLabel(m.mes)}`;
+    if (!t) return formatFechaCorta(parseISODate(m.fecha));
+    const ciclo = calcularCicloTC(m.fecha, t.diaCorte, t.diaPago);
+    const fp = ciclo.fechaPago;
+    const fpISO = `${fp.getFullYear()}-${String(fp.getMonth() + 1).padStart(2, '0')}-${String(fp.getDate()).padStart(2, '0')}`;
+    return `Compra del ${formatFechaCorta(parseISODate(m.fecha))} · ${fpISO < hoy ? 'venció' : 'se paga'} el ${formatFechaCorta(fp)}${m.tipo === 'fijo' ? ' · cada mes' : ''}`;
+  };
+  const hayFiltro = q.trim() || tarjetaId !== 'todas' || tipo !== 'todos';
+  return /*#__PURE__*/React.createElement("div", {
+    className: "buscador"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "buscador-input"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "search",
+    size: 16
+  }), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    placeholder: "Buscar en tus tarjetas",
+    value: q,
+    onChange: e => setQ(e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn small",
+    onClick: onCerrar,
+    "aria-label": "Cerrar buscador"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 14
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "agr-chips",
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(Chip, {
+    activo: tarjetaId === 'todas',
+    onClick: () => setTarjetaId('todas')
+  }, "Todas"), data.tarjetas.map(t => /*#__PURE__*/React.createElement(Chip, {
+    key: t.id,
+    activo: tarjetaId === t.id,
+    onClick: () => setTarjetaId(t.id)
+  }, t.nombre))), /*#__PURE__*/React.createElement("div", {
+    className: "agr-chips",
+    style: {
+      marginTop: 6
+    }
+  }, [['todos', 'Todo'], ['compras', 'Compras'], ['cuotas', 'Cuotas'], ['pagos', 'Pagos']].map(([k, l]) => /*#__PURE__*/React.createElement(Chip, {
+    key: k,
+    activo: tipo === k,
+    onClick: () => setTipo(k)
+  }, l))), hayFiltro && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    className: "buscador-cuenta"
+  }, res.length === 0 ? 'Sin resultados' : `${res.length} resultado${res.length === 1 ? '' : 's'}`), /*#__PURE__*/React.createElement("ul", {
+    className: "buscador-lista"
+  }, res.slice(0, 40).map(m => /*#__PURE__*/React.createElement("li", {
+    key: m.id
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "buscador-fila",
+    onClick: () => onIrAMes(m.mes)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "buscador-fila-main"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "buscador-desc"
+  }, m.desc, m.tipo !== 'pago' && /*#__PURE__*/React.createElement("span", {
+    className: "buscador-tag"
+  }, m.tarjeta)), /*#__PURE__*/React.createElement("span", {
+    className: "buscador-meta"
+  }, detalle(m))), /*#__PURE__*/React.createElement("span", {
+    className: `buscador-monto ${m.tipo === 'pago' ? 'positive' : ''}`
+  }, m.tipo === 'pago' ? '−' : '', formatQ(m.monto))))))));
+}
+
+// Guía de bienvenida: 4 pasos, se muestra una sola vez por usuario (se guarda en la cuenta).
+function GuiaBienvenida({
+  data,
+  user,
+  onGuardar,
+  onTerminar,
+  onAgregarGasto
+}) {
+  const mes = monthKey(new Date());
+  const ing = getIngresoMes(data.ingresos, mes) || {};
+  const [paso, setPaso] = useState(0);
+  const [nombre, setNombre] = useState(data.config && data.config.nombreBienvenida || '');
+  const [q1, setQ1] = useState(ing.q1 ? String(ing.q1) : '');
+  const [q2, setQ2] = useState(ing.q2 ? String(ing.q2) : '');
+  const [tNombre, setTNombre] = useState('');
+  const [tCorte, setTCorte] = useState('');
+  const [tPago, setTPago] = useState('');
+  const pasos = [{
+    icono: 'user',
+    titulo: '¿Cómo quieres que te salude?',
+    texto: 'Así te dará la bienvenida CoinPocket cada vez que entres.'
+  }, {
+    icono: 'banknote',
+    titulo: '¿Cuánto recibes por quincena?',
+    texto: 'Con esto CoinPocket calcula cuánto te queda cada mes.'
+  }, {
+    icono: 'creditCard',
+    titulo: 'Agrega tu tarjeta',
+    texto: 'Con el día de corte y de pago, CoinPocket te dice cuánto y cuándo pagar. Puedes saltar este paso.'
+  }, {
+    icono: 'plus',
+    titulo: 'Registra tu primer gasto',
+    texto: 'Todo se agrega con el botón "Agregar movimiento": gastos, pagos de tarjeta e ingresos extra.'
+  }];
+  function guardarPaso() {
+    if (paso === 0 && nombre.trim()) onGuardar(prev => ({
+      ...prev,
+      config: {
+        ...(prev.config || {}),
+        nombreBienvenida: nombre.trim().slice(0, 30)
+      }
+    }));
+    if (paso === 1 && (parseFloat(q1) > 0 || parseFloat(q2) > 0)) onGuardar(prev => {
+      const base = getIngresoMes(prev.ingresos, mes) || {};
+      return {
+        ...prev,
+        ingresos: {
+          ...prev.ingresos,
+          [mes]: {
+            ...base,
+            q1: parseFloat(q1) || 0,
+            q2: parseFloat(q2) || 0,
+            bono: base.bono || 0
+          }
+        }
+      };
+    });
+    if (paso === 2 && tNombre.trim()) onGuardar(prev => ({
+      ...prev,
+      tarjetas: [...prev.tarjetas, {
+        id: uid(),
+        nombre: tNombre.trim(),
+        diaCorte: clampDia(tCorte || 1),
+        diaPago: clampDia(tPago || 1)
+      }]
+    }));
+    setPaso(paso + 1);
+  }
+  const p = pasos[paso];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "asis-overlay guia-overlay"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "agr-panel guia-panel",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "guia-top"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "guia-paso"
+  }, "Paso ", paso + 1, " de 4"), /*#__PURE__*/React.createElement("button", {
+    className: "link-toggle",
+    onClick: onTerminar
+  }, "Saltar gu\xEDa")), /*#__PURE__*/React.createElement("div", {
+    className: "guia-body"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "guia-icono"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: p.icono,
+    size: 26
+  })), /*#__PURE__*/React.createElement("h3", {
+    className: "guia-titulo"
+  }, p.titulo), /*#__PURE__*/React.createElement("p", {
+    className: "guia-texto"
+  }, p.texto), paso === 0 && /*#__PURE__*/React.createElement("input", {
+    className: "field",
+    placeholder: primerNombreAuto(user) || 'Tu nombre',
+    maxLength: 30,
+    value: nombre,
+    onChange: e => setNombre(e.target.value)
+  }), paso === 1 && /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
+  }, "Primera quincena", /*#__PURE__*/React.createElement("input", {
+    className: "field",
+    type: "number",
+    inputMode: "decimal",
+    min: "0",
+    placeholder: "Q 0.00",
+    value: q1,
+    onChange: e => setQ1(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
+  }, "Segunda quincena", /*#__PURE__*/React.createElement("input", {
+    className: "field",
+    type: "number",
+    inputMode: "decimal",
+    min: "0",
+    placeholder: "Q 0.00",
+    value: q2,
+    onChange: e => setQ2(e.target.value)
+  }))), paso === 2 && /*#__PURE__*/React.createElement("div", {
+    className: "form-grid"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "field",
+    placeholder: "Nombre (ej. BAC VISA)",
+    value: tNombre,
+    onChange: e => setTNombre(e.target.value)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "monto-row"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "field",
+    type: "number",
+    min: "1",
+    max: "31",
+    placeholder: "D\xEDa de corte",
+    value: tCorte,
+    onChange: e => setTCorte(e.target.value)
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "field",
+    type: "number",
+    min: "1",
+    max: "31",
+    placeholder: "D\xEDa de pago",
+    value: tPago,
+    onChange: e => setTPago(e.target.value)
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "guia-puntos"
+  }, pasos.map((_, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: i <= paso ? 'on' : ''
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "agr-botones"
+  }, paso > 0 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-sec",
+    onClick: () => setPaso(paso - 1)
+  }, "Atr\xE1s"), paso === 2 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-sec",
+    onClick: () => setPaso(3)
+  }, "No tengo tarjeta"), paso < 3 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-add",
+    onClick: guardarPaso
+  }, "Siguiente"), paso === 3 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-sec",
+    onClick: onTerminar
+  }, "Despu\xE9s"), paso === 3 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-add",
+    onClick: () => {
+      onTerminar();
+      onAgregarGasto();
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "plus",
+    size: 16
+  }), " Agregar gasto"))));
+}
+
+// Pantalla principal de Ajustes: grupos + Cerrar sesión.
+function AjustesMenu({
+  user,
+  onAbrir,
+  onCerrarSesion
+}) {
+  const grupos = [['perfil', 'user', 'Mi perfil', 'Nombre de bienvenida y tu cuenta'], ['tarjetas', 'creditCard', 'Tarjetas', 'Agregar, editar, saldos y correcciones'], ['datos', 'database', 'Datos y respaldos', 'Copias, descargar, subir y borrar'], ['ayuda', 'help', 'Ayuda', 'Guía de bienvenida y preguntas']];
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "card ajustes-menu"
+  }, grupos.map(([k, ic, t, s]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    className: "ajustes-item",
+    onClick: () => onAbrir(k)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "ajustes-item-icono"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: ic,
+    size: 18
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "ajustes-item-txt"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "ajustes-item-titulo"
+  }, t), /*#__PURE__*/React.createElement("span", {
+    className: "ajustes-item-sub"
+  }, s)), /*#__PURE__*/React.createElement(Icon, {
+    name: "chevronRight",
+    size: 16
+  })))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn-cerrar-sesion",
+    onClick: onCerrarSesion
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "logOut",
+    size: 18
+  }), " Cerrar sesi\xF3n"), /*#__PURE__*/React.createElement("p", {
+    className: "ajustes-cuenta"
+  }, user.demo ? 'Vista previa: aquí aparece el correo de tu cuenta' : user.email));
+}
+const TITULOS_AJUSTES = {
+  perfil: 'Mi perfil',
+  tarjetas: 'Tarjetas',
+  datos: 'Datos y respaldos',
+  ayuda: 'Ayuda'
+};
+
+// Saldo del mes anterior: lo que sobra (o falta) pasa solo al mes siguiente, desde septiembre 2026.
+const ARRASTRE_DESDE = '2026-09';
+function saldoBaseMes(data, mes) {
+  const ing = getIngresoMes(data.ingresos, mes);
+  const unicos = data.gastos.filter(g => g.mes === mes && g.metodoPago !== 'tarjeta').reduce((a, g) => a + g.monto, 0);
+  const fijos = data.gastosFijos.filter(f => gastoFijoActivoEnMes(f, mes) && f.metodoPago !== 'tarjeta').reduce((a, f) => a + f.monto, 0);
+  const pagos = (data.pagosTarjeta || []).filter(p => (p.fecha ? p.fecha.slice(0, 7) : p.mes) === mes).reduce((a, p) => a + p.monto, 0);
+  const aportes = data.metas.reduce((s, m) => s + (m.aportes && m.aportes[mes] || 0), 0);
+  return ing.q1 + ing.q2 + ing.bono - unicos - fijos - pagos - aportes;
+}
+function arrastreMes(data, mes) {
+  const desde = data.config && data.config.arrastreDesde || ARRASTRE_DESDE;
+  if (mes <= desde) return 0;
+  let acumulado = 0;
+  for (let m = desde; m < mes; m = addMonths(m, 1)) acumulado += saldoBaseMes(data, m);
+  return acumulado;
+}
 function ControlGastos({
   user,
   onIrALogin
@@ -3889,6 +4457,10 @@ function ControlGastos({
   const [navHeight, setNavHeight] = useState(76);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
   const [agregarAbierto, setAgregarAbierto] = useState(false);
+  const [ajSec, setAjSec] = useState(null);
+  const [buscaInicio, setBuscaInicio] = useState(false);
+  const [buscaTC, setBuscaTC] = useState(false);
+  const [guiaManual, setGuiaManual] = useState(false);
   const [nombreDraft, setNombreDraft] = useState('');
   const [nombreMsg, setNombreMsg] = useState('');
   const [exportForm, setExportForm] = useState(false);
@@ -4042,8 +4614,8 @@ function ControlGastos({
   }, [data]);
   const nombreBienvenida = data.config && data.config.nombreBienvenida || '';
   useEffect(() => {
-    if (!loaded || user.local) return;
-    escribirLS(nombreGuardadoKey(user), nombreBienvenida || null);
+    if (!loaded || user.local && !user.demo) return;
+    if (!user.demo) escribirLS(nombreGuardadoKey(user), nombreBienvenida || null);
     setNombreDraft(nombreBienvenida);
   }, [loaded, nombreBienvenida]);
   function guardarNombreBienvenida() {
@@ -4200,7 +4772,8 @@ function ControlGastos({
     return sumUnicos + sumFijos + sumPagosTarjeta;
   }, [gastosUnicosMes, gastosFijosActivosMes, pagosTarjetaMes]);
   const aportesMes = useMemo(() => data.metas.reduce((sum, m) => sum + (m.aportes && m.aportes[currentMonth] || 0), 0), [data.metas, currentMonth]);
-  const saldo = ingresoEfectivo - totalGastosMes - aportesMes;
+  const arrastre = useMemo(() => arrastreMes(data, currentMonth), [data, currentMonth]);
+  const saldo = ingresoEfectivo + arrastre - totalGastosMes - aportesMes;
   const compromisosFuturos = useMemo(() => {
     return data.cuotas.map(c => ({
       ...c,
@@ -4918,7 +5491,7 @@ function ControlGastos({
     return React.createElement("button", {
       className: "link-toggle",
       onClick: () => togglePagadaManual(e.key)
-    }, "Marcar pagada");
+    }, "Ya la pagu\xE9");
   }
   async function exportarDatos() {
     setExportMsg('');
@@ -5298,7 +5871,15 @@ function ControlGastos({
     className: "label subtotal-label"
   }, "Ingreso total del mes"), React.createElement("span", {
     className: "amount-mono"
-  }, formatQ(ingresoEfectivo))), React.createElement("div", {
+  }, formatQ(ingresoEfectivo))), Math.abs(arrastre) > 0.005 && React.createElement("div", {
+    className: "balance-line"
+  }, React.createElement("span", {
+    className: "label"
+  }, arrastre >= 0 ? "Sobrante de " : "Faltante de ", monthLabel(addMonths(currentMonth, -1)).split(' ')[0].toLowerCase(), React.createElement(Info, {
+    texto: "Lo que te sobr\xF3 o falt\xF3 el mes pasado, contando lo que tra\xEDas de antes. Se calcula solo: si cambias algo de ese mes, se actualiza."
+  })), React.createElement("span", {
+    className: `amount-mono ${arrastre >= 0 ? '' : 'negative'}`
+  }, arrastre >= 0 ? "+" : "", formatQ(arrastre))), React.createElement("div", {
     className: "balance-line"
   }, React.createElement("span", {
     className: "label"
@@ -5316,11 +5897,9 @@ function ControlGastos({
     className: "balance-line no-pad"
   }, React.createElement("span", {
     className: "label total-label"
-  }, "Saldo restante"), React.createElement("span", {
+  }, "Me queda este mes", React.createElement(Info, { texto: "Lo que ganaste este mes menos tus gastos y lo que apartaste para tus metas." })), React.createElement("span", {
     className: `amount-mono big ${saldo >= 0 ? 'positive' : 'negative'}`
-  }, formatQ(saldo))), React.createElement("p", {
-    className: "balance-note"
-  }, saldo >= 0 ? `Con ${formatQ(ingresoEfectivo)} de ingreso, ${formatQ(totalGastosMes)} en gastos y ${formatQ(aportesMes)} apartado para tus metas, el mes cierra en positivo.` : `Entre gastos y ahorro apartado, superas el ingreso por ${formatQ(Math.abs(saldo))} este mes.`))), React.createElement("button", {
+  }, formatQ(saldo))))), React.createElement("button", {
     className: "btn-agregar-grande",
     onClick: () => setAgregarAbierto(true)
   }, React.createElement(Icon, {
@@ -5330,7 +5909,18 @@ function ControlGastos({
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
-  }, "Movimientos de ", monthLabel(currentMonth)), gastosUnicosMes.length === 0 && cuotasActivasMes.length === 0 && gastosFijosActivosMes.length === 0 && resumenTarjetasMes.length === 0 && pagosTarjetaMes.length === 0 ? React.createElement("p", {
+  }, "Movimientos de ", monthLabel(currentMonth), React.createElement("button", {
+    className: "icon-btn small lupa-btn",
+    onClick: () => setBuscaInicio(v => !v),
+    "aria-label": "Buscar movimientos"
+  }, React.createElement(Icon, {
+    name: "search",
+    size: 16
+  }))), buscaInicio && React.createElement(BuscadorMovimientos, {
+    data: data,
+    onIrAMes: m => { setCurrentMonth(m); setBuscaInicio(false); },
+    onCerrar: () => setBuscaInicio(false)
+  }), gastosUnicosMes.length === 0 && cuotasActivasMes.length === 0 && gastosFijosActivosMes.length === 0 && resumenTarjetasMes.length === 0 && pagosTarjetaMes.length === 0 ? React.createElement("p", {
     className: "empty-state"
   }, "A\xFAn no registras movimientos este mes. Toca \"Agregar movimiento\" arriba.") : React.createElement("ul", {
     className: "ledger-list"
@@ -5752,7 +6342,7 @@ function ControlGastos({
     className: "footer-row"
   }, React.createElement("button", {
     className: "link-btn",
-    onClick: () => setView('ajustes')
+    onClick: () => { setView('ajustes'); setAjSec(null); }
   }, "Ver configuraci\xF3n"))), view === 'tendencia' && React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
@@ -6110,7 +6700,7 @@ function ControlGastos({
       setAjusteFechaDraft(hoyISO());
       setAjusteSaldoFormId(t.id);
     }
-  }, "Ajustar saldo"))), React.createElement("div", {
+  }, "Corregir lo que debo"))), React.createElement("div", {
     className: "row-actions"
   }, React.createElement("span", {
     className: "amount-mono negative"
@@ -6122,7 +6712,28 @@ function ControlGastos({
   }, React.createElement(Icon, {
     name: "plus",
     size: 20
-  }), " Agregar movimiento"), React.createElement("div", {
+  }), " Agregar movimiento"), data.tarjetas.length > 0 && React.createElement("div", {
+    className: "card"
+  }, React.createElement("div", {
+    className: "lupa-header"
+  }, React.createElement("h2", {
+    className: "section-title",
+    style: { margin: 0 }
+  }, "Buscar en tarjetas"), React.createElement("button", {
+    className: "icon-btn small lupa-btn",
+    onClick: () => setBuscaTC(v => !v),
+    "aria-label": "Buscar en tarjetas"
+  }, React.createElement(Icon, {
+    name: buscaTC ? "x" : "search",
+    size: 16
+  }))), !buscaTC && React.createElement("p", {
+    className: "section-sub",
+    style: { marginBottom: 0 }
+  }, "Compras, cuotas y pagos de tus tarjetas, en todos los meses."), buscaTC && React.createElement(BuscadorTarjetas, {
+    data: data,
+    onIrAMes: m => { setCurrentMonth(m); },
+    onCerrar: () => setBuscaTC(false)
+  })), React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
@@ -6292,16 +6903,16 @@ function ControlGastos({
       name: "x",
       size: 16
     }))) : React.createElement("button", {
-      className: "abono-link",
-      onClick: () => {
-        setPagoTarjetaDraft('');
-        setPagoTarjetaFecha(hoyISO());
-        setMonedaPagoTarjeta('GTQ');
-        setTasaPagoTarjeta('');
-        setPagoExterno(false);
-        setPagoTarjetaFormId(t.id);
-      }
-    }, "+ Registrar pago"), pagoTarjetaFormId === t.id && React.createElement(React.Fragment, null, React.createElement("label", {
+      className: "btn-pagar",
+      onClick: () => setAgregarAbierto({
+        tipo: 'pago',
+        tarjetaId: t.id,
+        monto: totalMesActual > 0.005 ? totalMesActual.toFixed(2) : ''
+      })
+    }, React.createElement(Icon, {
+      name: "creditCard",
+      size: 15
+    }), " Pagar"), pagoTarjetaFormId === t.id && React.createElement(React.Fragment, null, React.createElement("label", {
       className: "check-externo"
     }, React.createElement("input", {
       type: "checkbox",
@@ -6542,7 +7153,7 @@ function ControlGastos({
             className: "row-desc"
           }, "Ajuste de saldo"), React.createElement("p", {
             className: "meta-detail"
-          }, "Hecho con \"Ajustar saldo\""))), React.createElement("div", {
+          }, "Hecho con \"Corregir lo que debo\""))), React.createElement("div", {
             className: "row-actions"
           }, React.createElement("span", {
             className: `amount-mono ${a.monto < 0 ? 'positive' : 'negative'}`
@@ -6718,7 +7329,7 @@ function ControlGastos({
     }
   }, "\xBFCu\xE1nto de este pago fue de compras que no anotaste? Deja vac\xEDo o 0 para quitarlo."), montoNoRegistrado(p) > 0 && React.createElement("span", {
     className: "pill pill-parcial"
-  }, montoNoRegistrado(p) >= p.monto - 0.005 ? 'Todo de compras no registradas' : `${formatQ(montoNoRegistrado(p))} de compras no registradas`))), React.createElement("div", {
+  }, montoNoRegistrado(p) >= p.monto - 0.005 ? 'Todo de cargos que no anoté' : `${formatQ(montoNoRegistrado(p))} de cargos que no anoté`))), React.createElement("div", {
     className: "row-actions"
   }, React.createElement("span", {
     className: "amount-mono positive"
@@ -6764,7 +7375,7 @@ function ControlGastos({
       setEditExternoDraft(montoNoRegistrado(p) > 0 ? String(+montoNoRegistrado(p).toFixed(2)) : '');
     },
     title: "Indica cu\xE1nto de este pago fue para compras que no anotaste en la app"
-  }, montoNoRegistrado(p) > 0 ? 'Editar no registradas' : 'Compras no registradas'), confirmingId === `pago__${p.id}` ? React.createElement("span", {
+  }, montoNoRegistrado(p) > 0 ? 'Editar cargos que no anoté' : 'Cargos que no anoté'), confirmingId === `pago__${p.id}` ? React.createElement("span", {
     className: "confirm-group"
   }, React.createElement("span", {
     className: "confirm-warning"
@@ -6785,7 +7396,30 @@ function ControlGastos({
   }, React.createElement(Icon, {
     name: "trash",
     size: 14
-  }))))))))), view === 'ajustes' && React.createElement(React.Fragment, null, data.tarjetas.length > 0 && React.createElement("div", {
+  }))))))))), view === 'ajustes' && React.createElement(React.Fragment, null, !ajSec && React.createElement(AjustesMenu, {
+    user: user,
+    onAbrir: k => { setAjSec(k); window.scrollTo(0, 0); },
+    onCerrarSesion: () => { if (user.demo) { window.alert('En la vista previa no hay sesión que cerrar.'); } else { auth.signOut(); } }
+  }), ajSec && React.createElement("button", {
+    className: "ajustes-volver",
+    onClick: () => { setAjSec(null); window.scrollTo(0, 0); }
+  }, React.createElement(Icon, {
+    name: "chevronLeft",
+    size: 18
+  }), " Ajustes"), ajSec && React.createElement("h2", {
+    className: "ajustes-sec-titulo"
+  }, TITULOS_AJUSTES[ajSec]), ajSec === 'ayuda' && React.createElement("div", {
+    className: "card"
+  }, React.createElement("div", {
+    className: "settings-row"
+  }, React.createElement("div", null, React.createElement("div", {
+    className: "settings-row-title"
+  }, "Gu\xEDa de bienvenida"), React.createElement("p", {
+    className: "meta-detail"
+  }, "Vuelve a ver los 4 pasos para empezar a usar CoinPocket.")), React.createElement("button", {
+    className: "btn-add small",
+    onClick: () => setGuiaManual(true)
+  }, "Ver gu\xEDa"))), ajSec === 'tarjetas' && data.tarjetas.length > 0 && React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
@@ -6892,7 +7526,7 @@ function ControlGastos({
   }, React.createElement(Icon, {
     name: "trash",
     size: 14
-  })))))))), data.tarjetas.length > 0 && React.createElement("div", {
+  })))))))), ajSec === 'tarjetas' && data.tarjetas.length > 0 && React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
@@ -6978,13 +7612,13 @@ function ControlGastos({
   }, React.createElement(Icon, {
     name: "pencil",
     size: 13
-  })))))))), ((data.ajustesTarjeta || []).length > 0 || data.tarjetas.some(t => t.conciliacion)) && React.createElement("div", {
+  })))))))), ajSec === 'tarjetas' && ((data.ajustesTarjeta || []).length > 0 || data.tarjetas.some(t => t.conciliacion)) && React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
-  }, "Ajustes de saldo"), React.createElement("p", {
+  }, "Correcciones de lo que debo", React.createElement(Info, { texto: "Montos que corregiste para que cuadren con tu estado de cuenta." })), React.createElement("p", {
     className: "section-sub"
-  }, "Saldos que ajustaste con \"Ajustar saldo\". Desde esa fecha la app toma ese monto como lo que debes; lo anterior queda como pagado."), React.createElement("ul", {
+  }, "Saldos que corregiste con \"Corregir lo que debo\". Desde esa fecha la app toma ese monto como lo que debes; lo anterior queda como pagado."), React.createElement("ul", {
     className: "ledger-list"
   }, data.tarjetas.filter(t => t.conciliacion).map(t => React.createElement("li", {
     key: `conc-${t.id}`,
@@ -7073,7 +7707,7 @@ function ControlGastos({
       name: "trash",
       size: 14
     }))));
-  }))), React.createElement("div", {
+  }))), ajSec === 'ayuda' && React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
@@ -7091,13 +7725,13 @@ function ControlGastos({
     className: "faq-body"
   }, c.respuesta.map((r, j) => React.createElement("p", {
     key: j
-  }, r))))))), React.createElement("div", {
+  }, r))))))), ['perfil', 'tarjetas', 'datos'].includes(ajSec) && React.createElement("div", {
     className: "card"
   }, React.createElement("h2", {
     className: "section-title"
-  }, "Configuraci\xF3n"), React.createElement("p", {
+  }, {perfil: 'Tu nombre', tarjetas: 'Opciones de tarjetas', datos: 'Tus datos'}[ajSec]), React.createElement("p", {
     className: "section-sub"
-  }, "Ajustes generales de la app."), !user.local && React.createElement("div", {
+  }, {perfil: 'C\xF3mo te saluda CoinPocket.', tarjetas: 'C\xF3mo calcula y muestra tus tarjetas.', datos: 'Copias, descargas y borrado de tus datos.'}[ajSec]), ajSec === 'perfil' && (!user.local || user.demo) && React.createElement("div", {
     className: "settings-row settings-col"
   }, React.createElement("div", null, React.createElement("div", {
     className: "settings-row-title"
@@ -7134,11 +7768,11 @@ function ControlGastos({
     style: {
       marginTop: 4
     }
-  }, nombreMsg)), React.createElement("div", {
+  }, nombreMsg)), ajSec === 'tarjetas' && React.createElement("div", {
     className: "settings-row"
   }, React.createElement("div", null, React.createElement("div", {
     className: "settings-row-title"
-  }, "Calcular tarjetas por fecha de corte"), React.createElement("p", {
+  }, "Ver por estado de cuenta", React.createElement(Info, { texto: "Agrupa tus compras según la fecha de corte de cada tarjeta, como tu estado de cuenta." })), React.createElement("p", {
     className: "meta-detail"
   }, "Apagado (recomendado): cada compra suma a tu deuda el d\xEDa que la haces. Encendido: las compras se cobran en la fecha de pago de su corte.")), React.createElement("button", {
     type: "button",
@@ -7154,13 +7788,13 @@ function ControlGastos({
     }))
   }, React.createElement("span", {
     className: "switch-knob"
-  }))), React.createElement("div", {
+  }))), ajSec === 'tarjetas' && React.createElement("div", {
     className: "settings-row"
   }, React.createElement("div", null, React.createElement("div", {
     className: "settings-row-title"
-  }, "Marcar compras como pagadas"), React.createElement("p", {
+  }, "Mostrar bot\xF3n \"Ya la pagu\xE9\"", React.createElement(Info, { texto: "Te deja quitar una compra de lo que debes sin registrar un pago." })), React.createElement("p", {
     className: "meta-detail"
-  }, "Encendido: en Tarjetas aparece \"Marcar pagada\" en cada compra pendiente. Apagado: se ocultan esos botones (lo ya marcado se conserva).")), React.createElement("button", {
+  }, "Encendido: en Tarjetas aparece \"Ya la pagu\xE9\" en cada compra pendiente. Apagado: se ocultan esos botones (lo ya marcado se conserva).")), React.createElement("button", {
     type: "button",
     role: "switch",
     "aria-checked": !!(data.config && data.config.marcarPagadas),
@@ -7168,13 +7802,13 @@ function ControlGastos({
     onClick: () => setMarcarPagadas(!(data.config && data.config.marcarPagadas))
   }, React.createElement("span", {
     className: "switch-knob"
-  }))), React.createElement("div", {
+  }))), ajSec === 'datos' && React.createElement("div", {
     className: "settings-row settings-col"
   }, React.createElement("div", {
     className: "settings-row-top"
   }, React.createElement("div", null, React.createElement("div", {
     className: "settings-row-title"
-  }, "Exportar mis datos"), React.createElement("p", {
+  }, "Descargar mis datos", React.createElement(Info, { texto: "Baja un archivo con todos tus registros, protegido con contraseña." })), React.createElement("p", {
     className: "meta-detail"
   }, "Descarga un archivo protegido con contrase\xF1a con todos tus registros.")), !exportForm && React.createElement("button", {
     className: "btn-add small",
@@ -7182,7 +7816,7 @@ function ControlGastos({
       setExportForm(true);
       setExportMsg('');
     }
-  }, "Exportar")), exportForm && React.createElement("div", {
+  }, "Descargar")), exportForm && React.createElement("div", {
     className: "form-grid",
     style: {
       marginTop: 10
@@ -7228,13 +7862,13 @@ function ControlGastos({
     style: {
       marginTop: 8
     }
-  }, exportMsg)), React.createElement("div", {
+  }, exportMsg)), ajSec === 'datos' && React.createElement("div", {
     className: "settings-row settings-col"
   }, React.createElement("div", null, React.createElement("div", {
     className: "settings-row-title"
-  }, "Importar un archivo exportado"), React.createElement("p", {
+  }, "Subir mis datos", React.createElement(Info, { texto: "Recupera tus registros desde un archivo que descargaste antes." })), React.createElement("p", {
     className: "meta-detail"
-  }, "Recupera tus datos desde un archivo de \"Exportar\". Reemplaza lo que tienes ahora.")), React.createElement("div", {
+  }, "Recupera tus datos desde un archivo de \"Descargar mis datos\". Reemplaza lo que tienes ahora.")), React.createElement("div", {
     className: "form-grid",
     style: {
       marginTop: 10
@@ -7267,21 +7901,21 @@ function ControlGastos({
     onCancelar: () => setImportListo(null)
   }), importMsg && React.createElement("p", {
     className: "hint"
-  }, importMsg))), !user.local && React.createElement("div", {
+  }, importMsg))), ajSec === 'datos' && !user.local && React.createElement("div", {
     className: "settings-row settings-col"
   }, React.createElement("div", {
     className: "settings-row-top"
   }, React.createElement("div", null, React.createElement("div", {
     className: "settings-row-title"
-  }, "Respaldos autom\xE1ticos"), React.createElement("p", {
+  }, "Copias autom\xE1ticas", React.createElement(Info, { texto: "Copia de seguridad de tus datos que se guarda sola en tu cuenta." })), React.createElement("p", {
     className: "meta-detail"
   }, "Cada ", RESPALDO_DIAS, " d\xEDas se guarda una copia de tus datos en tu cuenta. Se conservan los \xFAltimos ", RESPALDOS_A_GUARDAR, ".")), React.createElement("button", {
     className: "btn-add small",
     onClick: () => setConfirmingId('respaldo__nuevo')
-  }, "Respaldar ahora")), confirmingId === 'respaldo__nuevo' && React.createElement(DobleConfirmacion, {
-    pregunta: "\xBFCrear un respaldo ahora?",
+  }, "Guardar copia ahora")), confirmingId === 'respaldo__nuevo' && React.createElement(DobleConfirmacion, {
+    pregunta: "\xBFGuardar una copia ahora?",
     detalle: `Si ya existe uno de hoy, se reemplaza. Se conservan solo los últimos ${RESPALDOS_A_GUARDAR}.`,
-    textoBoton: "Respaldar",
+    textoBoton: "Guardar copia",
     onConfirmar: () => {
       setConfirmingId(null);
       respaldoManual();
@@ -7305,14 +7939,14 @@ function ControlGastos({
   }, confirmingId !== `resp__${r.id}` && React.createElement("button", {
     className: "link-toggle",
     onClick: () => setConfirmingId(`resp__${r.id}`)
-  }, "Restaurar")), confirmingId === `resp__${r.id}` && React.createElement("div", {
+  }, "Volver a esta copia")), confirmingId === `resp__${r.id}` && React.createElement("div", {
     style: {
       width: '100%'
     }
   }, React.createElement(DobleConfirmacion, {
-    pregunta: `¿Volver al respaldo del ${formatFechaCorta(parseISODate(r.fecha))}?`,
+    pregunta: `¿Volver a la copia del ${formatFechaCorta(parseISODate(r.fecha))}?`,
     detalle: "Tus datos actuales se reemplazan por los de ese d\xEDa. Lo que registraste despu\xE9s se pierde.",
-    textoBoton: "Restaurar",
+    textoBoton: "Volver a esta copia",
     onConfirmar: () => restaurarRespaldo(r),
     onCancelar: () => setConfirmingId(null)
   }))))), respaldoMsg && React.createElement("p", {
@@ -7320,7 +7954,7 @@ function ControlGastos({
     style: {
       marginTop: 8
     }
-  }, respaldoMsg)), React.createElement("div", {
+  }, respaldoMsg)), ajSec === 'datos' && React.createElement("div", {
     className: "settings-row settings-col"
   }, React.createElement("div", {
     className: "settings-row-top"
@@ -7337,7 +7971,13 @@ function ControlGastos({
     textoBoton: "Borrar todo",
     onConfirmar: confirmResetAll,
     onCancelar: () => setConfirmReset(false)
-  }))))), agregarAbierto && React.createElement(AgregarAsistido, {
+  }))))), (guiaManual || loaded && !(data.config && data.config.guiaVista)) && React.createElement(GuiaBienvenida, {
+    data: data,
+    user: user,
+    onGuardar: cambio => setData(cambio),
+    onTerminar: () => { setGuiaManual(false); setData(prev => ({ ...prev, config: { ...(prev.config || {}), guiaVista: true } })); },
+    onAgregarGasto: () => { setView('inicio'); setAgregarAbierto({ tipo: 'gasto' }); }
+  }), agregarAbierto && React.createElement(AgregarAsistido, {
     data: data,
     tc: tcActual,
     inicial: typeof agregarAbierto === 'object' ? agregarAbierto : null,
@@ -7367,31 +8007,31 @@ function ControlGastos({
     className: "tab-bar-inner"
   }, React.createElement("button", {
     className: `tab-bar-btn ${view === 'inicio' ? 'active' : ''}`,
-    onClick: () => setView('inicio')
+    onClick: () => { setView('inicio'); setAjSec(null); }
   }, React.createElement(Icon, {
     name: "layoutDashboard",
     size: 20
   }), React.createElement("span", null, "Inicio")), React.createElement("button", {
     className: `tab-bar-btn ${view === 'tendencia' ? 'active' : ''}`,
-    onClick: () => setView('tendencia')
+    onClick: () => { setView('tendencia'); setAjSec(null); }
   }, React.createElement(Icon, {
     name: "trendingUp",
     size: 20
   }), React.createElement("span", null, "Tendencia")), React.createElement("button", {
     className: `tab-bar-btn ${view === 'ahorro' ? 'active' : ''}`,
-    onClick: () => setView('ahorro')
+    onClick: () => { setView('ahorro'); setAjSec(null); }
   }, React.createElement(Icon, {
     name: "piggyBank",
     size: 20
   }), React.createElement("span", null, "Ahorro")), React.createElement("button", {
     className: `tab-bar-btn ${view === 'tarjetas' ? 'active' : ''}`,
-    onClick: () => setView('tarjetas')
+    onClick: () => { setView('tarjetas'); setAjSec(null); }
   }, React.createElement(Icon, {
     name: "creditCard",
     size: 20
   }), React.createElement("span", null, "Tarjetas")), React.createElement("button", {
     className: `tab-bar-btn ${view === 'ajustes' ? 'active' : ''}`,
-    onClick: () => setView('ajustes')
+    onClick: () => { setView('ajustes'); setAjSec(null); }
   }, React.createElement(Icon, {
     name: "settings",
     size: 20
@@ -7746,6 +8386,56 @@ const STYLES = `
 .agr-hecho { display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; padding:18px 6px; }
 .agr-hecho-icono { width:56px; height:56px; border-radius:50%; background:rgba(48,209,88,0.16); color:var(--positive); display:flex; align-items:center; justify-content:center; }
 .agr-hecho p { margin:0; font-size:14px; color:var(--text); }
+.lupa-btn { margin-left:auto; }
+.section-title:has(.lupa-btn) { display:flex; align-items:center; gap:8px; }
+.lupa-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.buscador { margin:4px 0 12px; }
+.buscador-input { display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--border-strong); border-radius:12px; padding:4px 6px 4px 12px; color:var(--text-secondary); }
+.buscador-input input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--text); font-size:14.5px; padding:8px 0; font-family:'Inter',sans-serif; }
+.buscador-cuenta { font-size:12px; color:var(--text-secondary); margin:10px 0 4px; }
+.buscador-lista { list-style:none; margin:0; padding:0; }
+.buscador-fila { width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; background:transparent; border:none; border-bottom:1px solid var(--border); padding:10px 2px; color:var(--text); cursor:pointer; text-align:left; font-family:'Inter',sans-serif; }
+.buscador-fila-main { display:flex; flex-direction:column; min-width:0; }
+.buscador-desc { font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.buscador-tag { font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:8px; background:var(--accent-soft); color:var(--accent); }
+.buscador-meta { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.buscador-monto { font-size:14px; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.buscador-monto.positive { color:var(--positive); }
+.btn-pagar { display:inline-flex; align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 16px; font-size:13.5px; font-weight:700; cursor:pointer; margin-top:8px; font-family:'Inter',sans-serif; }
+.info-wrap { position:relative; display:inline-flex; vertical-align:middle; margin-left:6px; }
+.info-btn { background:transparent; border:none; padding:0; color:var(--accent); cursor:pointer; display:inline-flex; }
+.info-pop { position:absolute; z-index:30; top:22px; left:-10px; width:220px; background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; padding:10px 12px; font-size:12.5px; font-weight:500; line-height:1.45; color:var(--text); box-shadow:0 10px 24px rgba(0,0,0,0.45); text-transform:none; letter-spacing:0; white-space:normal; }
+.ajustes-menu { padding:6px 6px; }
+.ajustes-item { width:100%; display:flex; align-items:center; gap:12px; background:transparent; border:none; border-bottom:1px solid var(--border); padding:14px 10px; color:var(--text); cursor:pointer; text-align:left; font-family:'Inter',sans-serif; }
+.ajustes-item:last-child { border-bottom:none; }
+.ajustes-item > svg { color:var(--text-secondary); }
+.ajustes-item-icono { width:36px; height:36px; border-radius:10px; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ajustes-item-txt { flex:1; min-width:0; display:flex; flex-direction:column; }
+.ajustes-item-titulo { font-size:15px; font-weight:700; }
+.ajustes-item-sub { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.btn-cerrar-sesion { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; color:var(--negative); border:1px solid rgba(255,69,58,0.4); border-radius:14px; padding:13px; font-size:15px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif; margin-top:4px; }
+.ajustes-cuenta { text-align:center; font-size:12px; color:var(--text-secondary); margin:10px 0 16px; }
+.ajustes-volver { display:inline-flex; align-items:center; gap:4px; background:transparent; border:none; color:var(--accent); font-size:14.5px; font-weight:600; cursor:pointer; padding:4px 0; margin-bottom:4px; font-family:'Inter',sans-serif; }
+.ajustes-sec-titulo { font-size:22px; font-weight:800; margin:0 0 14px; color:var(--text); }
+.guia-overlay { z-index:80; }
+.guia-panel { top:50%; bottom:auto; transform:translate(-50%,-50%); }
+.guia-top { display:flex; justify-content:space-between; align-items:center; padding:14px 16px 0; }
+.guia-paso { font-size:12px; font-weight:600; color:var(--text-secondary); }
+.guia-body { padding:18px 20px 10px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; }
+.guia-body .form-grid, .guia-body > .field { width:100%; text-align:left; }
+.guia-icono { width:60px; height:60px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; }
+.guia-titulo { margin:4px 0 0; font-size:19px; font-weight:800; color:var(--text); }
+.guia-texto { margin:0 0 6px; font-size:13.5px; color:var(--text-secondary); line-height:1.5; }
+.guia-puntos { display:flex; gap:5px; margin-top:6px; }
+.guia-puntos span { width:22px; height:4px; border-radius:2px; background:rgba(255,255,255,0.14); }
+.guia-puntos span.on { background:var(--accent); }
+.saldo-highlight .balance-line { gap:8px; }
+.saldo-highlight .amount-mono.big { white-space:nowrap; font-size:24px; }
+.card > .settings-row:first-child { border-top:none; padding-top:0; margin-top:0; }
+.settings-row .btn-add.small { white-space:nowrap; flex-shrink:0; }
+.arrastre-line { display:flex; justify-content:space-between; align-items:center; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:13.5px; font-weight:600; }
+.arrastre-line.pos { background:rgba(48,209,88,0.12); color:var(--positive); }
+.arrastre-line.neg { background:rgba(255,69,58,0.12); color:var(--negative); }
 .privacidad-nota { font-size:11px; line-height:1.55; color:var(--text-secondary); text-align:justify; text-align-last:left; hyphens:auto; -webkit-hyphens:auto; margin:22px 0 0; opacity:0.85; }
 .reset-confirm { display:flex; align-items:center; justify-content:center; gap:10px; font-size:12.5px; color:var(--negative); flex-wrap:wrap; }
 
